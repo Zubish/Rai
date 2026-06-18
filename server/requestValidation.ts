@@ -2,6 +2,7 @@ import type { RaiChatRequest } from "./raiChatService";
 
 const maxMessageLength = 2_000;
 const maxBranchIds = 20;
+const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export type ValidationResult =
   | { ok: true; value: RaiChatRequest }
@@ -29,6 +30,12 @@ export function validateRaiChatBody(body: Record<string, unknown>): ValidationRe
     return { ok: false, status: 400, error: "tenantId must be a string when provided." };
   }
 
+  if (body.sessionId !== undefined) {
+    if (typeof body.sessionId !== "string" || !uuidPattern.test(body.sessionId)) {
+      return { ok: false, status: 400, error: "sessionId must be a valid UUID when provided." };
+    }
+  }
+
   if (body.branchIds !== undefined && !Array.isArray(body.branchIds)) {
     return { ok: false, status: 400, error: "branchIds must be an array of strings when provided." };
   }
@@ -41,6 +48,7 @@ export function validateRaiChatBody(body: Record<string, unknown>): ValidationRe
     ok: true,
     value: {
       message,
+      sessionId: typeof body.sessionId === "string" ? body.sessionId : undefined,
       tenantId: typeof body.tenantId === "string" ? body.tenantId : undefined,
       branchIds
     }

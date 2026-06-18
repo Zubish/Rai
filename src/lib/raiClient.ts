@@ -3,20 +3,31 @@ import { parseRaiQuestion } from "./intentParser";
 import type { RaiReport } from "./types";
 
 export type RaiClientResponse = {
+  sessionId?: string;
   assistantText: string;
   report: RaiReport;
   orchestrationMode: "openai_tools" | "deterministic_fallback" | "client_fallback";
   model?: string;
 };
 
-export async function askRaiBackend(message: string): Promise<RaiClientResponse> {
+export type RaiLibraryItemInput = {
+  name: string;
+  type: "image" | "file" | "report" | "spreadsheet" | "insight";
+  source: "upload" | "rai";
+  metadata?: Record<string, unknown>;
+};
+
+export async function askRaiBackend(
+  message: string,
+  options: { sessionId?: string } = {}
+): Promise<RaiClientResponse> {
   try {
     const response = await fetch("/api/rai/chat", {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
       },
-      body: JSON.stringify({ message })
+      body: JSON.stringify({ message, sessionId: options.sessionId })
     });
 
     if (!response.ok) {
@@ -44,5 +55,21 @@ export async function askRaiBackend(message: string): Promise<RaiClientResponse>
       },
       orchestrationMode: "client_fallback"
     };
+  }
+}
+
+export async function saveRaiLibraryItem(item: RaiLibraryItemInput): Promise<boolean> {
+  try {
+    const response = await fetch("/api/rai/library", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(item)
+    });
+
+    return response.ok;
+  } catch {
+    return false;
   }
 }

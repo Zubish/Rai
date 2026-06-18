@@ -7,11 +7,13 @@ import { executeRaiTool, raiOpenAiTools, type RaiToolCallArgs } from "./raiToolR
 
 export type RaiChatRequest = {
   message: string;
+  sessionId?: string;
   tenantId?: string;
   branchIds?: string[];
 };
 
 export type RaiChatResponse = {
+  sessionId?: string;
   assistantText: string;
   report: RaiReport;
   orchestrationMode: "openai_tools" | "deterministic_fallback";

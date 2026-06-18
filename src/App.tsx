@@ -44,7 +44,7 @@ import {
   XAxis,
   YAxis
 } from "recharts";
-import { askRaiBackend } from "./lib/raiClient";
+import { askRaiBackend, saveRaiLibraryItem } from "./lib/raiClient";
 import type { RaiClientResponse } from "./lib/raiClient";
 import type { RaiReport } from "./lib/types";
 import "./styles.css";
@@ -136,6 +136,7 @@ export default function App() {
   const [activeView, setActiveView] = useState<ViewName>("chat");
   const [question, setQuestion] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [activeSessionId, setActiveSessionId] = useState<string | undefined>();
   const [isThinking, setIsThinking] = useState(false);
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const [libraryItems, setLibraryItems] = useState<LibraryItem[]>([]);
@@ -154,6 +155,7 @@ export default function App() {
     setActiveView("chat");
     setMessages([]);
     setQuestion("");
+    setActiveSessionId(undefined);
   }
 
   function openView(view: ViewName) {
@@ -196,7 +198,10 @@ export default function App() {
       return;
     }
 
-    const result = await askRaiBackend(trimmed);
+    const result = await askRaiBackend(trimmed, { sessionId: activeSessionId });
+    if (result.sessionId) {
+      setActiveSessionId(result.sessionId);
+    }
     setMessages((current) => [
       ...current,
       {
@@ -227,6 +232,17 @@ export default function App() {
       source: "upload"
     }));
     setLibraryItems((current) => [...newItems, ...current]);
+    newItems.forEach((item) => {
+      void saveRaiLibraryItem({
+        name: item.name,
+        type: item.type,
+        source: item.source,
+        metadata: {
+          size: item.size,
+          modified: item.modified
+        }
+      });
+    });
     setActiveView("library");
   }
 
@@ -234,17 +250,25 @@ export default function App() {
     const extension = format === "excel" ? "xlsx" : format === "pdf" ? "pdf" : "rai";
     const name = `${report?.title ?? "Pharmacy Pulse"}.${extension}`;
     const type = format === "excel" ? "spreadsheet" : format === "pdf" ? "report" : "insight";
-    setLibraryItems((current) => [
-      {
-        id: `export-${format}-${Date.now()}`,
-        name,
-        type,
-        modified: "Today",
-        size: format === "excel" ? "84 KB" : "128 KB",
-        source: "rai"
-      },
-      ...current
-    ]);
+    const item: LibraryItem = {
+      id: `export-${format}-${Date.now()}`,
+      name,
+      type,
+      modified: "Today",
+      size: format === "excel" ? "84 KB" : "128 KB",
+      source: "rai"
+    };
+    setLibraryItems((current) => [item, ...current]);
+    void saveRaiLibraryItem({
+      name: item.name,
+      type: item.type,
+      source: item.source,
+      metadata: {
+        format,
+        reportId: report?.id,
+        reportTitle: report?.title
+      }
+    });
   }
 
   function createLocalProject() {
