@@ -1,9 +1,10 @@
 import OpenAI from "openai";
-import { runRaiAnalytics } from "../src/lib/analyticsEngine.js";
+import { runRaiAnalytics, type RaiAnalyticsDataSource } from "../src/lib/analyticsEngine.js";
 import { parseRaiQuestion } from "../src/lib/intentParser.js";
 import type { RaiReport } from "../src/lib/types.js";
 import { getOpenAiModel, isOpenAiConfigured, loadRaiEnvironment } from "./env.js";
 import { executeRaiTool, raiOpenAiTools, type RaiToolCallArgs } from "./raiToolRegistry.js";
+import { getRxLedgerAnalyticsDataSource } from "./rxledgerApiConnector.js";
 
 export type RaiChatRequest = {
   message: string;
@@ -28,14 +29,17 @@ export async function runRaiChat(request: RaiChatRequest): Promise<RaiChatRespon
     return deterministicResponse("Ask Rai a business, inventory, forecasting, or profit question.");
   }
 
+  const { dataSource, warning } = await getLiveDataSource(request);
+
   if (!isOpenAiConfigured()) {
-    return deterministicResponse(message);
+    return deterministicResponse(message, dataSource, warning);
   }
 
   try {
-    return await runOpenAiToolOrchestration(message);
+    const response = await runOpenAiToolOrchestration(message, dataSource);
+    return warning ? appendWarning(response, warning) : response;
   } catch (error) {
-    const fallback = await deterministicResponse(message);
+    const fallback = await deterministicResponse(message, dataSource, warning);
     return {
       ...fallback,
       report: {
@@ -49,7 +53,10 @@ export async function runRaiChat(request: RaiChatRequest): Promise<RaiChatRespon
   }
 }
 
-async function runOpenAiToolOrchestration(message: string): Promise<RaiChatResponse> {
+async function runOpenAiToolOrchestration(
+  message: string,
+  dataSource?: RaiAnalyticsDataSource
+): Promise<RaiChatResponse> {
   const client = new OpenAI();
   const model = getOpenAiModel();
   const firstResponse = await client.responses.create({
@@ -76,7 +83,7 @@ async function runOpenAiToolOrchestration(message: string): Promise<RaiChatRespo
       report: await executeRaiTool(toolCall.name, {
         ...toolCall.arguments,
         question: toolCall.arguments.question || message
-      })
+      }, dataSource)
     }))
   );
   const sourceReport = executedTools[0].report;
@@ -119,14 +126,42 @@ async function runOpenAiToolOrchestration(message: string): Promise<RaiChatRespo
   };
 }
 
-async function deterministicResponse(message: string): Promise<RaiChatResponse> {
-  const report = await runRaiAnalytics(parseRaiQuestion(message));
+async function deterministicResponse(
+  message: string,
+  dataSource?: RaiAnalyticsDataSource,
+  warning?: string
+): Promise<RaiChatResponse> {
+  const report = await runRaiAnalytics(parseRaiQuestion(message), dataSource);
 
   return {
     assistantText: report.directAnswer,
-    report,
+    report: warning ? { ...report, warnings: [...report.warnings, warning] } : report,
     orchestrationMode: "deterministic_fallback",
     toolCalls: []
+  };
+}
+
+async function getLiveDataSource(request: RaiChatRequest): Promise<{
+  dataSource?: RaiAnalyticsDataSource;
+  warning?: string;
+}> {
+  try {
+    const dataSource = await getRxLedgerAnalyticsDataSource(request);
+    return { dataSource };
+  } catch {
+    return {
+      warning: "Live RxLedger API data was unavailable, so Rai used the approved local analytics fixture."
+    };
+  }
+}
+
+function appendWarning(response: RaiChatResponse, warning: string): RaiChatResponse {
+  return {
+    ...response,
+    report: {
+      ...response.report,
+      warnings: [...response.report.warnings, warning]
+    }
   };
 }
 

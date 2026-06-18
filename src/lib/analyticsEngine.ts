@@ -1,4 +1,9 @@
-import { dispensedMedicationRecords, medications, type Medication } from "./mockRxLedgerData.js";
+import {
+  dispensedMedicationRecords,
+  medications,
+  type DispenseRecord,
+  type Medication
+} from "./mockRxLedgerData.js";
 import type {
   RaiIntent,
   RaiReport,
@@ -13,7 +18,28 @@ const currency = new Intl.NumberFormat("en-NG", {
   maximumFractionDigits: 0
 });
 
-export async function runRaiAnalytics(intent: RaiIntent): Promise<RaiReport> {
+export type RaiAnalyticsDataSource = {
+  medications: Medication[];
+  dispensedMedicationRecords: DispenseRecord[];
+  sourceLabel?: string;
+};
+
+const mockAnalyticsDataSource: RaiAnalyticsDataSource = {
+  medications,
+  dispensedMedicationRecords,
+  sourceLabel: "approved mock RxLedger analytics adapter"
+};
+
+let activeAnalyticsDataSource = mockAnalyticsDataSource;
+
+export async function runRaiAnalytics(
+  intent: RaiIntent,
+  dataSource: RaiAnalyticsDataSource = mockAnalyticsDataSource
+): Promise<RaiReport> {
+  const previousDataSource = activeAnalyticsDataSource;
+  activeAnalyticsDataSource = dataSource;
+
+  try {
   if (intent.intent === "unsupported") {
     return unsupportedReport(intent.reason);
   }
@@ -43,6 +69,9 @@ export async function runRaiAnalytics(intent: RaiIntent): Promise<RaiReport> {
       return cashTiedInventoryReport();
     case "business_health_review":
       return businessHealthReviewReport();
+  }
+  } finally {
+    activeAnalyticsDataSource = previousDataSource;
   }
 }
 
@@ -258,7 +287,7 @@ function reorderForecastReport(medicationQuery: string, forecastMonths: number):
 
 function riskReport(intent: RiskIntent, kind: "stockout" | "expiry" | "slow"): RaiReport {
   if (kind === "stockout") {
-    const rows = [...medications]
+    const rows = [...medicationData()]
       .sort((a, b) => a.daysUntilStockout - b.daysUntilStockout)
       .slice(0, 4)
       .map((medication) => ({
@@ -281,7 +310,7 @@ function riskReport(intent: RiskIntent, kind: "stockout" | "expiry" | "slow"): R
   }
 
   if (kind === "expiry") {
-    const rows = medications
+    const rows = medicationData()
       .filter((medication) => medication.expiryRiskQuantity > 0)
       .map((medication) => ({
         medication: `${medication.name} ${medication.strength}`,
@@ -302,7 +331,7 @@ function riskReport(intent: RiskIntent, kind: "stockout" | "expiry" | "slow"): R
     );
   }
 
-  const rows = medications
+  const rows = medicationData()
     .filter((medication) => medication.daysSinceLastSale > 60)
     .map((medication) => ({
       medication: `${medication.name} ${medication.strength}`,
@@ -324,7 +353,7 @@ function riskReport(intent: RiskIntent, kind: "stockout" | "expiry" | "slow"): R
 }
 
 function budgetRestockPlanReport(budgetNaira: number): RaiReport {
-  const candidates = medications
+  const candidates = medicationData()
     .map((medication) => {
       const twoMonthDemand = medication.averageMonthlyUsage * 2;
       const leadTimeDemand = Math.ceil((medication.averageMonthlyUsage / 30) * medication.supplierLeadTimeDays);
@@ -463,7 +492,7 @@ function demandForecastReport(category: string, horizonDays: number): RaiReport 
 }
 
 function profitMaximizationReport(): RaiReport {
-  const rows = medications
+  const rows = medicationData()
     .map((medication) => {
       const grossProfitPerUnit = medication.sellingPricePerUnit - medication.costPerUnit;
       const marginPercent = medication.sellingPricePerUnit > 0 ? (grossProfitPerUnit / medication.sellingPricePerUnit) * 100 : 0;
@@ -518,7 +547,7 @@ function profitMaximizationReport(): RaiReport {
 }
 
 function cashTiedInventoryReport(): RaiReport {
-  const rows = medications
+  const rows = medicationData()
     .filter((medication) => medication.daysSinceLastSale > 60 || medication.expiryRiskQuantity > 0)
     .map((medication) => ({
       medication: `${medication.name} ${medication.strength}`,
@@ -529,7 +558,7 @@ function cashTiedInventoryReport(): RaiReport {
     }))
     .sort((a, b) => b.stockValue - a.stockValue);
   const slowMovingCash = sum(
-    medications
+    medicationData()
       .filter((medication) => medication.daysSinceLastSale > 60)
       .map((medication) => medication.stockValue)
   );
@@ -574,12 +603,12 @@ function businessHealthReviewReport(): RaiReport {
   });
   const grossProfit = sum(profitReportRows.map((row) => row.grossProfit));
   const cashAtRisk = sum(
-    medications
+    medicationData()
       .filter((medication) => medication.daysSinceLastSale > 60 || medication.expiryRiskQuantity > 0)
       .map((medication) => medication.stockValue)
   );
-  const urgentStockouts = medications.filter((medication) => medication.daysUntilStockout <= 21);
-  const expiryItems = medications.filter((medication) => medication.expiryRiskQuantity > 0);
+  const urgentStockouts = medicationData().filter((medication) => medication.daysUntilStockout <= 21);
+  const expiryItems = medicationData().filter((medication) => medication.expiryRiskQuantity > 0);
   const rows = [
     {
       signal: "Profit engine",
@@ -698,9 +727,19 @@ function unsupportedReport(reason: string): RaiReport {
   };
 }
 
+function medicationData(): Medication[] {
+  return activeAnalyticsDataSource.medications.length
+    ? activeAnalyticsDataSource.medications
+    : mockAnalyticsDataSource.medications;
+}
+
+function dispenseRecordData(): DispenseRecord[] {
+  return activeAnalyticsDataSource.dispensedMedicationRecords;
+}
+
 function findMedication(query: string): Medication {
   const lower = query.toLowerCase();
-  const medication = medications.find((item) =>
+  const medication = medicationData().find((item) =>
     `${item.name} ${item.strength}`.toLowerCase().includes(lower)
   );
 
@@ -708,20 +747,20 @@ function findMedication(query: string): Medication {
     return medication;
   }
 
-  const byName = medications.find((item) => lower.includes(item.name.toLowerCase()));
-  return byName ?? medications[0];
+  const byName = medicationData().find((item) => lower.includes(item.name.toLowerCase()));
+  return byName ?? medicationData()[0];
 }
 
 function medicationsByCategory(category: string): Medication[] {
   if (category === "all") {
-    return medications;
+    return medicationData();
   }
 
-  return medications.filter((medication) => medication.category === category);
+  return medicationData().filter((medication) => medication.category === category);
 }
 
 function recordsForMedication(medication: Medication, startDate: string, endDate: string) {
-  return dispensedMedicationRecords.filter(
+  return dispenseRecordData().filter(
     (record) =>
       record.medicationId === medication.id &&
       record.dispensedAt >= startDate &&

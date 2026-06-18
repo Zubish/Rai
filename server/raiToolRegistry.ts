@@ -1,4 +1,4 @@
-import { runRaiAnalytics } from "../src/lib/analyticsEngine.js";
+import { runRaiAnalytics, type RaiAnalyticsDataSource } from "../src/lib/analyticsEngine.js";
 import { parseRaiQuestion } from "../src/lib/intentParser.js";
 import type { RaiDateRange, RaiIntent, RaiReport } from "../src/lib/types.js";
 
@@ -51,21 +51,25 @@ export const raiOpenAiTools = [
   tool("summarize_business_health", "Summarize owner-level pharmacy business health.")
 ] as const;
 
-export async function executeRaiTool(name: string, args: RaiToolCallArgs): Promise<RaiReport> {
+export async function executeRaiTool(
+  name: string,
+  args: RaiToolCallArgs,
+  dataSource?: RaiAnalyticsDataSource
+): Promise<RaiReport> {
   if (!isRaiToolName(name)) {
     return runRaiAnalytics({
       intent: "unsupported",
       reason: `Rai does not have an approved tool named ${name}.`
-    });
+    }, dataSource);
   }
 
   const question = args.question?.trim();
   const parsed = question ? parseRaiQuestion(question) : null;
   if (parsed && parsed.intent !== "unsupported" && toolMatchesIntent(name, parsed.intent)) {
-    return runRaiAnalytics(parsed);
+    return runRaiAnalytics(parsed, dataSource);
   }
 
-  return runRaiAnalytics(intentForTool(name, args, question ?? ""));
+  return runRaiAnalytics(intentForTool(name, args, question ?? ""), dataSource);
 }
 
 function tool(name: RaiToolName, description: string) {

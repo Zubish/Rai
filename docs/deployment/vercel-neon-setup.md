@@ -28,6 +28,11 @@ Add these in Vercel Project Settings > Environment Variables for Production, Pre
 - `POSTGRES_URL`: Neon pooled connection string.
 - `OPENAI_API_KEY`: OpenAI API key for Rai tool orchestration.
 - `OPENAI_MODEL`: Optional; defaults to `gpt-5.4-mini`.
+- `RXLEDGER_API_BASE_URL`: Base URL for the approved RxLedger API.
+- `RXLEDGER_API_KEY`: Read-only API token issued by RxLedger for Rai.
+- `RXLEDGER_ANALYTICS_SNAPSHOT_PATH`: Optional; defaults to `/api/rai/analytics-snapshot`.
+- `RXLEDGER_TENANT_ID`: Tenant/workspace id Rai should request from RxLedger.
+- `RXLEDGER_BRANCH_IDS`: Comma-separated branch ids, for example `main,branch-2`.
 
 `DATABASE_URL` may also be set as a fallback alias for `POSTGRES_URL`.
 
@@ -46,7 +51,8 @@ Expected:
   "ok": true,
   "service": "rai-api",
   "openaiConfigured": true,
-  "databaseConfigured": true
+  "databaseConfigured": true,
+  "rxledgerConfigured": true
 }
 ```
 

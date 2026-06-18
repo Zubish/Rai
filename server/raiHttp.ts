@@ -6,6 +6,7 @@ import {
   persistRaiChatExchange,
   saveLibraryItem
 } from "./raiPersistence.js";
+import { getRxLedgerConnectionStatus } from "./rxledgerApiConnector.js";
 import { checkRateLimit } from "./rateLimit.js";
 import { runRaiChat } from "./raiChatService.js";
 import { validateRaiChatBody } from "./requestValidation.js";
@@ -25,6 +26,7 @@ export async function handleRaiApiRequest(
       service: "rai-api",
       openaiConfigured: isOpenAiConfigured(),
       databaseConfigured: isDatabaseConfigured(),
+      rxledgerConfigured: getRxLedgerConnectionStatus().configured,
       model: getOpenAiModel()
     });
     return true;
