@@ -1,7 +1,6 @@
 import { neon, type NeonQueryFunction } from "@neondatabase/serverless";
-import type { RaiReport } from "../src/lib/types";
-import { loadRaiEnvironment } from "./env";
-import type { RaiChatRequest, RaiChatResponse } from "./raiChatService";
+import { loadRaiEnvironment } from "./env.js";
+import type { RaiChatRequest, RaiChatResponse } from "./raiChatService.js";
 
 type LibraryItemInput = {
   name: string;

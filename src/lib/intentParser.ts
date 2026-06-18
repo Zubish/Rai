@@ -1,4 +1,4 @@
-import type { RaiDateRange, RaiIntent } from "./types";
+import type { RaiDateRange, RaiIntent } from "./types.js";
 
 const MARCH_2026: RaiDateRange = {
   startDate: "2026-03-01",

@@ -1,6 +1,6 @@
-import { runRaiAnalytics } from "../src/lib/analyticsEngine";
-import { parseRaiQuestion } from "../src/lib/intentParser";
-import type { RaiDateRange, RaiIntent, RaiReport } from "../src/lib/types";
+import { runRaiAnalytics } from "../src/lib/analyticsEngine.js";
+import { parseRaiQuestion } from "../src/lib/intentParser.js";
+import type { RaiDateRange, RaiIntent, RaiReport } from "../src/lib/types.js";
 
 type RaiToolName =
   | "get_unique_patients_on_medication"

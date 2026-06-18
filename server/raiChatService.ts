@@ -1,9 +1,9 @@
 import OpenAI from "openai";
-import { runRaiAnalytics } from "../src/lib/analyticsEngine";
-import { parseRaiQuestion } from "../src/lib/intentParser";
-import type { RaiReport } from "../src/lib/types";
-import { getOpenAiModel, isOpenAiConfigured, loadRaiEnvironment } from "./env";
-import { executeRaiTool, raiOpenAiTools, type RaiToolCallArgs } from "./raiToolRegistry";
+import { runRaiAnalytics } from "../src/lib/analyticsEngine.js";
+import { parseRaiQuestion } from "../src/lib/intentParser.js";
+import type { RaiReport } from "../src/lib/types.js";
+import { getOpenAiModel, isOpenAiConfigured, loadRaiEnvironment } from "./env.js";
+import { executeRaiTool, raiOpenAiTools, type RaiToolCallArgs } from "./raiToolRegistry.js";
 
 export type RaiChatRequest = {
   message: string;

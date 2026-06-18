@@ -1,11 +1,11 @@
-import { dispensedMedicationRecords, medications, type Medication } from "./mockRxLedgerData";
+import { dispensedMedicationRecords, medications, type Medication } from "./mockRxLedgerData.js";
 import type {
   RaiIntent,
   RaiReport,
   ReportTable,
   RiskIntent,
   UniquePatientsIntent
-} from "./types";
+} from "./types.js";
 
 const currency = new Intl.NumberFormat("en-NG", {
   style: "currency",

@@ -1,4 +1,4 @@
-import type { RaiChatRequest } from "./raiChatService";
+import type { RaiChatRequest } from "./raiChatService.js";
 
 const maxMessageLength = 2_000;
 const maxBranchIds = 20;

@@ -1,14 +1,14 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { getOpenAiModel, isOpenAiConfigured, loadRaiEnvironment } from "./env";
+import { getOpenAiModel, isOpenAiConfigured, loadRaiEnvironment } from "./env.js";
 import {
   isDatabaseConfigured,
   listLibraryItems,
   persistRaiChatExchange,
   saveLibraryItem
-} from "./raiPersistence";
-import { checkRateLimit } from "./rateLimit";
-import { runRaiChat } from "./raiChatService";
-import { validateRaiChatBody } from "./requestValidation";
+} from "./raiPersistence.js";
+import { checkRateLimit } from "./rateLimit.js";
+import { runRaiChat } from "./raiChatService.js";
+import { validateRaiChatBody } from "./requestValidation.js";
 
 const maxBodyBytes = 32 * 1024;
 

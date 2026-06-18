@@ -1,5 +1,5 @@
 import { createServer } from "node:http";
-import { handleRaiApiRequest } from "./raiHttp";
+import { handleRaiApiRequest } from "./raiHttp.js";
 
 const port = Number(process.env.RAI_API_PORT || 8787);
 
