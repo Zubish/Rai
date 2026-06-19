@@ -132,6 +132,47 @@ describe("Rai Gemini orchestration", () => {
       name: "answer_rxledger_question"
     });
   });
+
+  it("preserves the original user question scope when Gemini omits branch and date arguments", async () => {
+    globalThis.fetch = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          candidates: [
+            {
+              content: {
+                parts: [
+                  {
+                    functionCall: {
+                      name: "get_medication_sales_quantity",
+                      args: {
+                        question: "Aprovel sales",
+                        medicationQuery: "Aprovel"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        })
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          candidates: [{ content: { parts: [{ text: "Scoped answer." }] } }]
+        })
+      } as Response);
+
+    const { runRaiChat } = await import("./raiChatService");
+    const response = await runRaiChat({
+      message: "from lagos branch how many aprovel was sold yesterday"
+    });
+
+    expect(response.report.assumptions).toContain("Branch scope: lagos.");
+    expect(response.report.assumptions).toContain("Date range: 2026-06-18 to 2026-06-18.");
+  });
 });
 
 function restoreEnv(name: string, value: string | undefined) {

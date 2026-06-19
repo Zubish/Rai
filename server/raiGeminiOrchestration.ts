@@ -85,7 +85,7 @@ export async function runGeminiToolOrchestration(
     functionCall.name,
     {
       ...functionCall.arguments,
-      question: functionCall.arguments.question || message
+      question: message
     },
     dataSource
   );

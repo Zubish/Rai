@@ -133,7 +133,7 @@ async function runOpenAiToolOrchestration(
       ...toolCall,
       report: await executeRaiTool(toolCall.name, {
         ...toolCall.arguments,
-        question: toolCall.arguments.question || message
+        question: message
       }, dataSource)
     }))
   );
