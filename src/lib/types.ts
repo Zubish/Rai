@@ -6,6 +6,7 @@ export type RaiDateRange = {
 
 export type RaiIntentName =
   | "unique_patients_on_medication"
+  | "medication_sales_quantity"
   | "medication_category_usage"
   | "sales_profit_summary"
   | "reorder_forecast"
@@ -29,6 +30,11 @@ export type UniquePatientsIntent = BaseIntent & {
   medicationQuery: string;
   deduplicateBy: "patient_id";
   matchStrength: boolean;
+};
+
+export type MedicationSalesQuantityIntent = BaseIntent & {
+  intent: "medication_sales_quantity";
+  medicationQuery: string;
 };
 
 export type MedicationCategoryUsageIntent = BaseIntent & {
@@ -77,6 +83,7 @@ export type UnsupportedIntent = {
 
 export type RaiIntent =
   | UniquePatientsIntent
+  | MedicationSalesQuantityIntent
   | MedicationCategoryUsageIntent
   | SalesProfitSummaryIntent
   | ReorderForecastIntent

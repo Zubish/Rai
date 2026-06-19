@@ -1,5 +1,6 @@
 import type { RaiAnalyticsDataSource } from "../src/lib/analyticsEngine.js";
 import type { DispenseRecord, Medication } from "../src/lib/mockRxLedgerData.js";
+import { parseRaiQuestionScope } from "../src/lib/raiScope.js";
 import { loadRaiEnvironment } from "./env.js";
 import type { RaiChatRequest } from "./raiChatService.js";
 
@@ -16,17 +17,22 @@ export type RxLedgerConnectionStatus = {
   configured: boolean;
   baseUrl?: string;
   snapshotPath: string;
+  tenantConfigured: boolean;
 };
 
 const defaultSnapshotPath = "/api/rai/analytics-snapshot";
+const defaultTenantId = "totalenergies";
+const defaultBaseUrl = "https://rxledger.vercel.app";
 
 export function getRxLedgerConnectionStatus(): RxLedgerConnectionStatus {
   loadRaiEnvironment();
   const baseUrl = process.env.RXLEDGER_API_BASE_URL?.trim();
+  const resolvedBaseUrl = baseUrl || defaultBaseUrl;
   return {
-    configured: Boolean(baseUrl && process.env.RXLEDGER_API_KEY),
-    baseUrl,
-    snapshotPath: process.env.RXLEDGER_ANALYTICS_SNAPSHOT_PATH || defaultSnapshotPath
+    configured: Boolean(resolvedBaseUrl && process.env.RXLEDGER_API_KEY),
+    baseUrl: resolvedBaseUrl,
+    snapshotPath: process.env.RXLEDGER_ANALYTICS_SNAPSHOT_PATH || defaultSnapshotPath,
+    tenantConfigured: Boolean(process.env.RXLEDGER_TENANT_ID?.trim())
   };
 }
 
@@ -37,6 +43,7 @@ export async function getRxLedgerAnalyticsDataSource(
   if (!status.configured || !status.baseUrl) {
     return undefined;
   }
+  const scope = resolveRxLedgerScope(request);
 
   const response = await fetch(new URL(status.snapshotPath, ensureTrailingSlash(status.baseUrl)), {
     method: "POST",
@@ -46,13 +53,11 @@ export async function getRxLedgerAnalyticsDataSource(
       "X-Rai-Source": "rai"
     },
     body: JSON.stringify({
-      tenant_id: request.tenantId ?? process.env.RXLEDGER_TENANT_ID ?? "demo-tenant",
-      branch_ids: request.branchIds?.length
-        ? request.branchIds
-        : parseBranchIds(process.env.RXLEDGER_BRANCH_IDS),
-      start_date: process.env.RXLEDGER_ANALYTICS_START_DATE ?? "2026-01-01",
-      end_date: process.env.RXLEDGER_ANALYTICS_END_DATE ?? new Date().toISOString().slice(0, 10),
-      timezone: process.env.RXLEDGER_TIMEZONE ?? "Africa/Lagos",
+      tenant_id: scope.tenantId,
+      branch_ids: scope.branchIds,
+      start_date: scope.startDate,
+      end_date: scope.endDate,
+      timezone: scope.timezone,
       include_voided: false,
       include_returns: false
     })
@@ -83,6 +88,32 @@ export async function getRxLedgerAnalyticsDataSource(
     medications: mappedMedications,
     dispensedMedicationRecords: mappedRecords,
     sourceLabel: "live RxLedger API"
+  };
+}
+
+export function resolveRxLedgerScope(
+  request: RaiChatRequest,
+  now: Date = new Date()
+): {
+  tenantId: string;
+  branchIds: string[];
+  startDate: string;
+  endDate: string;
+  timezone: string;
+} {
+  const timezone = process.env.RXLEDGER_TIMEZONE ?? "Africa/Lagos";
+  const parsedScope = parseRaiQuestionScope(request.message, now, timezone);
+  const envBranchIds = parseBranchIds(process.env.RXLEDGER_BRANCH_IDS);
+  const explicitBranchIds = request.branchIds?.map(normalizeBranchId).filter(isNonEmptyString) ?? [];
+  const parsedBranchIds = parsedScope.branchIds.includes("main") ? [] : parsedScope.branchIds;
+  const branchIds = explicitBranchIds.length ? explicitBranchIds : parsedBranchIds.length ? parsedBranchIds : envBranchIds;
+
+  return {
+    tenantId: request.tenantId?.trim() || process.env.RXLEDGER_TENANT_ID?.trim() || defaultTenantId,
+    branchIds,
+    startDate: process.env.RXLEDGER_ANALYTICS_START_DATE ?? parsedScope.dateRange.startDate,
+    endDate: process.env.RXLEDGER_ANALYTICS_END_DATE ?? parsedScope.dateRange.endDate,
+    timezone
   };
 }
 
@@ -161,7 +192,11 @@ function getArray(source: Record<string, unknown>, keys: string[]): unknown[] {
 }
 
 function parseBranchIds(value: string | undefined): string[] {
-  return value?.split(",").map((item) => item.trim()).filter(Boolean) ?? ["main"];
+  return value?.split(",").map(normalizeBranchId).filter(isNonEmptyString) ?? ["main"];
+}
+
+function normalizeBranchId(value: string): string {
+  return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
 }
 
 function calculateDaysUntilStockout(currentStock: number, averageMonthlyUsage: number): number {
@@ -193,4 +228,8 @@ function isObjectRecord(value: unknown): value is Record<string, unknown> {
 
 function isDefined<T>(value: T | undefined): value is T {
   return value !== undefined;
+}
+
+function isNonEmptyString(value: string): value is string {
+  return value.length > 0;
 }

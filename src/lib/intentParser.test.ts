@@ -8,6 +8,7 @@ describe("parseRaiQuestion", () => {
       "unique_patients_on_medication"
     ],
     ["Generate report on total antihypertensives dispensed in March", "medication_category_usage"],
+    ["From Lagos branch how many Aprovel was sold yesterday?", "medication_sales_quantity"],
     ["Show the most profitable antihypertensives last month", "sales_profit_summary"],
     ["What should I reorder for Aprovel for seven months?", "reorder_forecast"],
     ["Which medications are likely to stock out soon?", "stockout_risk"],
@@ -30,6 +31,23 @@ describe("parseRaiQuestion", () => {
     expect(intent.medicationQuery).toBe("Amaryl 2mg");
     expect(intent.deduplicateBy).toBe("patient_id");
     expect(intent.matchStrength).toBe(true);
+  });
+
+  it("extracts branch and date scope for medication quantity sold questions", () => {
+    const intent = parseRaiQuestion(
+      "From Lagos branch how many Aprovel was sold yesterday?",
+      new Date("2026-06-19T05:00:00.000Z")
+    );
+
+    expect(intent.intent).toBe("medication_sales_quantity");
+    if (intent.intent !== "medication_sales_quantity") {
+      throw new Error("Expected medication quantity sold intent");
+    }
+
+    expect(intent.medicationQuery).toBe("Aprovel");
+    expect(intent.branchIds).toEqual(["lagos"]);
+    expect(intent.dateRange.startDate).toBe("2026-06-18");
+    expect(intent.dateRange.endDate).toBe("2026-06-18");
   });
 
   it("rejects write requests with a read-only analytics reason", () => {

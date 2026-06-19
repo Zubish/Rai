@@ -4,6 +4,7 @@ import type { RaiDateRange, RaiIntent, RaiReport } from "../src/lib/types.js";
 
 type RaiToolName =
   | "get_unique_patients_on_medication"
+  | "get_medication_sales_quantity"
   | "get_medication_category_usage"
   | "get_sales_profit_summary"
   | "get_reorder_forecast"
@@ -37,6 +38,10 @@ export const raiOpenAiTools = [
   tool(
     "get_unique_patients_on_medication",
     "Count unique patients on a named medication, deduplicated by patient ID."
+  ),
+  tool(
+    "get_medication_sales_quantity",
+    "Calculate how many units of a named medication were sold or dispensed for a branch and date range."
   ),
   tool("get_medication_category_usage", "Summarize medication category usage, revenue, and gross profit."),
   tool("get_sales_profit_summary", "Rank medicines by sales, gross profit, and margin."),
@@ -123,6 +128,13 @@ function intentForTool(name: RaiToolName, args: RaiToolCallArgs, question: strin
         deduplicateBy: "patient_id",
         matchStrength: true
       };
+    case "get_medication_sales_quantity":
+      return {
+        intent: "medication_sales_quantity",
+        medicationQuery: args.medicationQuery || medicationFromQuestion(question) || "Aprovel",
+        dateRange: defaultDateRange,
+        branchIds: mainBranch
+      };
     case "get_medication_category_usage":
       return {
         intent: "medication_category_usage",
@@ -186,6 +198,7 @@ function isRaiToolName(name: string): name is RaiToolName {
 function toolMatchesIntent(name: RaiToolName, intent: RaiIntent["intent"]): boolean {
   const mapping: Record<RaiToolName, RaiIntent["intent"]> = {
     get_unique_patients_on_medication: "unique_patients_on_medication",
+    get_medication_sales_quantity: "medication_sales_quantity",
     get_medication_category_usage: "medication_category_usage",
     get_sales_profit_summary: "sales_profit_summary",
     get_reorder_forecast: "reorder_forecast",

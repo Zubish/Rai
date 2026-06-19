@@ -1,26 +1,12 @@
-import type { RaiDateRange, RaiIntent } from "./types.js";
-
-const MARCH_2026: RaiDateRange = {
-  startDate: "2026-03-01",
-  endDate: "2026-03-31",
-  label: "March 2026"
-};
-
-const LAST_MONTH: RaiDateRange = MARCH_2026;
-
-const ALL_AVAILABLE: RaiDateRange = {
-  startDate: "2026-01-01",
-  endDate: "2026-06-17",
-  label: "All available 2026 data"
-};
+import type { RaiIntent } from "./types.js";
+import { parseRaiQuestionScope } from "./raiScope.js";
 
 const KNOWN_MEDICATIONS = ["Exforge 10/160", "Amaryl 2mg", "Aprovel"];
 
-export function parseRaiQuestion(question: string): RaiIntent {
+export function parseRaiQuestion(question: string, now?: Date): RaiIntent {
   const normalized = question.trim();
   const lower = normalized.toLowerCase();
-  const dateRange = findDateRange(lower);
-  const branchIds = ["main"];
+  const { dateRange, branchIds } = parseRaiQuestionScope(lower, now);
 
   if (isWriteRequest(lower)) {
     return unsupported(
@@ -107,9 +93,21 @@ export function parseRaiQuestion(question: string): RaiIntent {
     return {
       intent: "sales_profit_summary",
       category: lower.includes("antihypertensive") ? "antihypertensive" : undefined,
-      dateRange: lower.includes("last month") ? LAST_MONTH : dateRange,
+      dateRange,
       branchIds,
       sortBy: "grossProfit"
+    };
+  }
+
+  const medicationSalesQuery = findMedicationQuery(normalized);
+  if (asksForMedicationSalesQuantity(lower) && medicationSalesQuery) {
+    const medicationQuery = medicationSalesQuery;
+
+    return {
+      intent: "medication_sales_quantity",
+      medicationQuery,
+      dateRange,
+      branchIds
     };
   }
 
@@ -165,16 +163,15 @@ function findMedicationQuery(question: string): string | null {
   );
 }
 
-function findDateRange(question: string): RaiDateRange {
-  if (question.includes("march") || question.includes("last month")) {
-    return MARCH_2026;
-  }
-
-  return ALL_AVAILABLE;
+function isWriteRequest(question: string): boolean {
+  return /\b(change|edit|delete|remove|update|adjust|create)\b/.test(question);
 }
 
-function isWriteRequest(question: string): boolean {
-  return /\b(change|edit|delete|remove|update|adjust|create|dispense|sell)\b/.test(question);
+function asksForMedicationSalesQuantity(question: string): boolean {
+  return (
+    /\b(how many|number of|qty|quantity|total)\b/.test(question) &&
+    /\b(sold|sale|sales|dispensed|issued|given)\b/.test(question)
+  );
 }
 
 function extractBudgetNaira(question: string): number | null {

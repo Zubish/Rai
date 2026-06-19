@@ -47,6 +47,70 @@ It does not review or redesign RxLedger internals.
 }
 ```
 
+## MVP Snapshot Endpoint
+
+Purpose: provide Rai with a read-only, branch-aware analytics snapshot for the current MVP before deeper per-report endpoints are available.
+
+```text
+POST /api/rai/analytics-snapshot
+Authorization: Bearer <RXLEDGER_API_KEY>
+```
+
+Minimum request body:
+
+```json
+{
+  "tenant_id": "totalenergies",
+  "branch_ids": ["lagos"],
+  "start_date": "2026-06-18",
+  "end_date": "2026-06-18",
+  "timezone": "Africa/Lagos",
+  "include_voided": false,
+  "include_returns": false
+}
+```
+
+Minimum response body:
+
+```json
+{
+  "data": {
+    "medications": [],
+    "dispensed_medication_records": []
+  },
+  "meta": {
+    "source": "rxledger",
+    "tenant_id": "totalenergies",
+    "branch_ids": ["lagos"]
+  }
+}
+```
+
+Required medication fields:
+
+- medication_id
+- medication_name
+- strength
+- category
+- unit or dosage_form
+- current_stock
+- average_monthly_usage
+- cost_per_unit
+- selling_price_per_unit
+
+Required dispensing fields:
+
+- transaction_id
+- patient_id
+- medication_id
+- quantity_dispensed
+- branch_id
+- dispensed_at
+- voided
+- returned
+
+Current production check on `https://rxledger.vercel.app/api/rai/analytics-snapshot` returns `404 Not Found`, so RxLedger still needs to expose this approved endpoint and issue the bearer key before Rai can read live TotalEnergies data.
+
 ## Endpoint 1: Medication Usage Report
 
 Purpose: show medication quantity, transaction count, revenue, and gross profit.
@@ -252,4 +316,3 @@ Required response fields:
 - Does RxLedger store cost price per batch or per product?
 - How are returns, voided transactions, and owed/pending medication represented?
 - How are tenant and branch permissions enforced for analytics requests?
-

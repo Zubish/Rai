@@ -8,6 +8,20 @@ async function ask(question: string) {
 }
 
 describe("runRaiAnalytics", () => {
+  it("answers branch-scoped medication quantity sold questions", async () => {
+    const intent = parseRaiQuestion(
+      "From Lagos branch how many Aprovel was sold yesterday?",
+      new Date("2026-06-19T05:00:00.000Z")
+    );
+    const report = await runRaiAnalytics(intent);
+
+    expect(report.status).toBe("success");
+    expect(report.toolName).toBe("get_medication_sales_quantity");
+    expect(report.directAnswer).toContain("0 tablets of Aprovel 150mg");
+    expect(report.assumptions).toContain("Branch scope: lagos.");
+    expect(report.warnings).toContain("No matching dispensing records were found for this scope.");
+  });
+
   it("deduplicates repeated Exforge purchases by patient ID", async () => {
     const report = await ask("How many unique patients are on Exforge 10/160 in March?");
 

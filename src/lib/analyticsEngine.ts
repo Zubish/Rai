@@ -7,6 +7,7 @@ import {
 import type {
   RaiIntent,
   RaiReport,
+  MedicationSalesQuantityIntent,
   ReportTable,
   RiskIntent,
   UniquePatientsIntent
@@ -47,6 +48,8 @@ export async function runRaiAnalytics(
   switch (intent.intent) {
     case "unique_patients_on_medication":
       return uniquePatientsReport(intent);
+    case "medication_sales_quantity":
+      return medicationSalesQuantityReport(intent);
     case "medication_category_usage":
       return categoryUsageReport(intent.category);
     case "sales_profit_summary":
@@ -77,7 +80,12 @@ export async function runRaiAnalytics(
 
 function uniquePatientsReport(intent: UniquePatientsIntent): RaiReport {
   const medication = findMedication(intent.medicationQuery);
-  const records = recordsForMedication(medication, intent.dateRange.startDate, intent.dateRange.endDate);
+  const records = recordsForMedication(
+    medication,
+    intent.dateRange.startDate,
+    intent.dateRange.endDate,
+    intent.branchIds
+  );
   const uniquePatients = new Set(records.map((record) => record.patientId));
   const quantity = sum(records.map((record) => record.quantity));
 
@@ -126,6 +134,69 @@ function uniquePatientsReport(intent: UniquePatientsIntent): RaiReport {
     suggestedActions: [
       "Compare this patient demand against current stock and refill cycle.",
       "Use reorder forecast if this medicine is chronic or frequently owed."
+    ]
+  };
+}
+
+function medicationSalesQuantityReport(intent: MedicationSalesQuantityIntent): RaiReport {
+  const medication = findMedication(intent.medicationQuery);
+  const records = recordsForMedication(
+    medication,
+    intent.dateRange.startDate,
+    intent.dateRange.endDate,
+    intent.branchIds
+  );
+  const quantity = sum(records.map((record) => record.quantity));
+  const revenue = quantity * medication.sellingPricePerUnit;
+  const branchLabel = intent.branchIds.includes("main") ? "selected branch scope" : intent.branchIds.join(", ");
+
+  return {
+    status: "success",
+    id: "medication-sales-quantity",
+    intentLabel: "Medication quantity sold",
+    title: `${medication.name} ${medication.strength} quantity sold`,
+    directAnswer: `${quantity} ${medication.unit} of ${medication.name} ${medication.strength} were sold or dispensed in ${intent.dateRange.label}.`,
+    summary:
+      "Rai matched the medicine, filtered dispensing records by date and branch, excluded voided or returned transactions, then summed quantity dispensed.",
+    toolName: "get_medication_sales_quantity",
+    metricCards: [
+      { label: "Quantity sold", value: `${quantity} ${medication.unit}`, helper: intent.dateRange.label },
+      { label: "Transactions", value: String(records.length), helper: "dispensing events reviewed" },
+      { label: "Estimated revenue", value: currency.format(revenue), helper: branchLabel }
+    ],
+    chartData: [
+      { label: "Quantity", value: quantity },
+      { label: "Transactions", value: records.length },
+      { label: "Revenue / 1000", value: revenue / 1000 }
+    ],
+    table: {
+      columns: [
+        { key: "medication", label: "Medication" },
+        { key: "branch", label: "Branch" },
+        { key: "quantity", label: "Quantity" },
+        { key: "transactions", label: "Transactions" },
+        { key: "estimatedRevenue", label: "Estimated revenue" }
+      ],
+      rows: [
+        {
+          medication: `${medication.name} ${medication.strength}`,
+          branch: intent.branchIds.join(", "),
+          quantity: `${quantity} ${medication.unit}`,
+          transactions: records.length,
+          estimatedRevenue: currency.format(revenue)
+        }
+      ]
+    },
+    assumptions: [
+      `Date range: ${intent.dateRange.startDate} to ${intent.dateRange.endDate}.`,
+      `Branch scope: ${intent.branchIds.join(", ")}.`,
+      "Voided and returned transactions are excluded.",
+      `Source system is represented by ${activeAnalyticsDataSource.sourceLabel ?? "the active analytics adapter"}.`
+    ],
+    warnings: records.length === 0 ? ["No matching dispensing records were found for this scope."] : [],
+    suggestedActions: [
+      "Compare quantity sold with current stock before deciding whether to reorder.",
+      "If this looks lower than expected, confirm the branch and date filter."
     ]
   };
 }
@@ -759,12 +830,20 @@ function medicationsByCategory(category: string): Medication[] {
   return medicationData().filter((medication) => medication.category === category);
 }
 
-function recordsForMedication(medication: Medication, startDate: string, endDate: string) {
+function recordsForMedication(
+  medication: Medication,
+  startDate: string,
+  endDate: string,
+  branchIds: string[] = ["main"]
+) {
+  const shouldFilterByBranch = branchIds.length > 0 && !branchIds.includes("main");
+
   return dispenseRecordData().filter(
     (record) =>
       record.medicationId === medication.id &&
       record.dispensedAt >= startDate &&
       record.dispensedAt <= endDate &&
+      (!shouldFilterByBranch || branchIds.includes(record.branchId)) &&
       !record.voided &&
       !record.returned
   );

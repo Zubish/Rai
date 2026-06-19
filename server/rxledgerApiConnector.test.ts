@@ -2,18 +2,23 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   getRxLedgerAnalyticsDataSource,
-  getRxLedgerConnectionStatus
+  getRxLedgerConnectionStatus,
+  resolveRxLedgerScope
 } from "./rxledgerApiConnector";
 
 const originalFetch = globalThis.fetch;
 const originalBaseUrl = process.env.RXLEDGER_API_BASE_URL;
 const originalApiKey = process.env.RXLEDGER_API_KEY;
 const originalPath = process.env.RXLEDGER_ANALYTICS_SNAPSHOT_PATH;
+const originalTenantId = process.env.RXLEDGER_TENANT_ID;
+const originalBranchIds = process.env.RXLEDGER_BRANCH_IDS;
 
 afterEach(() => {
   restoreEnv("RXLEDGER_API_BASE_URL", originalBaseUrl);
   restoreEnv("RXLEDGER_API_KEY", originalApiKey);
   restoreEnv("RXLEDGER_ANALYTICS_SNAPSHOT_PATH", originalPath);
+  restoreEnv("RXLEDGER_TENANT_ID", originalTenantId);
+  restoreEnv("RXLEDGER_BRANCH_IDS", originalBranchIds);
   globalThis.fetch = originalFetch;
   vi.restoreAllMocks();
 });
@@ -25,7 +30,29 @@ describe("RxLedger API connector", () => {
 
     expect(getRxLedgerConnectionStatus()).toMatchObject({
       configured: false,
-      snapshotPath: "/api/rai/analytics-snapshot"
+      baseUrl: "https://rxledger.vercel.app",
+      snapshotPath: "/api/rai/analytics-snapshot",
+      tenantConfigured: false
+    });
+  });
+
+  it("resolves totalenergies workspace, branch, and yesterday scope from natural language", () => {
+    delete process.env.RXLEDGER_TENANT_ID;
+    process.env.RXLEDGER_BRANCH_IDS = "main";
+
+    const scope = resolveRxLedgerScope(
+      {
+        message: "From Lagos branch how many Aprovel was sold yesterday?"
+      },
+      new Date("2026-06-19T05:00:00.000Z")
+    );
+
+    expect(scope).toEqual({
+      tenantId: "totalenergies",
+      branchIds: ["lagos"],
+      startDate: "2026-06-18",
+      endDate: "2026-06-18",
+      timezone: "Africa/Lagos"
     });
   });
 
@@ -64,9 +91,9 @@ describe("RxLedger API connector", () => {
     } as Response);
 
     const dataSource = await getRxLedgerAnalyticsDataSource({
-      message: "Show live data",
+      message: "From Lagos branch how many Live Drug was sold yesterday?",
       tenantId: "tenant-live",
-      branchIds: ["main"]
+      branchIds: ["lagos"]
     });
 
     expect(globalThis.fetch).toHaveBeenCalledWith(
@@ -79,6 +106,11 @@ describe("RxLedger API connector", () => {
       })
     );
     expect(dataSource?.sourceLabel).toBe("live RxLedger API");
+    const requestInit = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0][1] as RequestInit;
+    expect(JSON.parse(String(requestInit.body))).toMatchObject({
+      tenant_id: "tenant-live",
+      branch_ids: ["lagos"]
+    });
     expect(dataSource?.medications[0]).toMatchObject({
       id: "med-live-1",
       name: "Live Drug",
