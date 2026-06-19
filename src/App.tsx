@@ -1,11 +1,10 @@
-import { useMemo, useRef, useState } from "react";
+import { useId, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import {
   AlertTriangle,
   Archive,
   ArrowUpRight,
   BarChart3,
-  Bot,
   ClipboardList,
   Copy,
   Download,
@@ -619,12 +618,43 @@ function MobileNav({ onNewChat }: { onNewChat: () => void }) {
 function BrandLockup({ compact = false }: { compact?: boolean }) {
   return (
     <div className={compact ? "brand-lockup compact" : "brand-lockup"}>
-      <div className="brand-mark">R</div>
+      <RaiLogo compact={compact} />
       <div>
         {compact ? <span className="brand-title">Rai</span> : <h1>Rai</h1>}
         {!compact && <p>RxLedger Intelligence</p>}
       </div>
     </div>
+  );
+}
+
+function RaiLogo({ compact = false }: { compact?: boolean }) {
+  const logoId = useId().replace(/:/g, "");
+  const wordGradientId = `rai-word-${logoId}`;
+  const sparkGradientId = `rai-spark-${logoId}`;
+  return (
+    <span className={compact ? "rai-logo-tile compact" : "rai-logo-tile"} aria-hidden="true">
+      <svg className="rai-logo-svg" viewBox="0 0 168 72" role="img">
+        <defs>
+          <linearGradient id={wordGradientId} x1="12" x2="150" y1="16" y2="56" gradientUnits="userSpaceOnUse">
+            <stop offset="0" stopColor="#26C6DA" />
+            <stop offset="0.46" stopColor="#2B6BFF" />
+            <stop offset="1" stopColor="#8A2BEF" />
+          </linearGradient>
+          <linearGradient id={sparkGradientId} x1="121" x2="150" y1="5" y2="39" gradientUnits="userSpaceOnUse">
+            <stop offset="0" stopColor="#A855F7" />
+            <stop offset="1" stopColor="#6D28D9" />
+          </linearGradient>
+        </defs>
+        <text x="12" y="55" fill={`url(#${wordGradientId})`} className="rai-logo-text">
+          Rai
+        </text>
+        <path
+          className="rai-logo-spark"
+          d="M132 8c4.5 13 9.8 18.3 23 22.8-13.2 4.5-18.5 9.8-23 22.9-4.5-13.1-9.8-18.4-23-22.9 13.2-4.5 18.5-9.8 23-22.8Z"
+          fill={`url(#${sparkGradientId})`}
+        />
+      </svg>
+    </span>
   );
 }
 
@@ -760,7 +790,7 @@ function ChatMessage({
 function AssistantAvatar() {
   return (
     <div className="assistant-avatar">
-      <Bot size={17} aria-hidden="true" />
+      <RaiLogo compact />
     </div>
   );
 }
@@ -1177,7 +1207,7 @@ function AppsView({ onOpenRxLedger }: { onOpenRxLedger: () => void }) {
         <input placeholder="Search apps" />
       </div>
       <div className="apps-hero">
-        <div className="app-logo">R</div>
+        <RaiLogo />
         <h3>RxLedger</h3>
         <p>Inventory, dispensing, patients, sales, and pharmacy operations data.</p>
         <span>Connected</span>
