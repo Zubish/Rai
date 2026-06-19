@@ -59,4 +59,14 @@ describe("parseRaiQuestion", () => {
     }
     expect(intent.reason).toContain("read-only analytics");
   });
+
+  it("does not map a plain greeting to a random RxLedger capability", () => {
+    const intent = parseRaiQuestion("hi");
+
+    expect(intent.intent).toBe("unsupported");
+    if (intent.intent !== "unsupported") {
+      throw new Error("Expected unsupported greeting intent");
+    }
+    expect(intent.reason).not.toContain("Continuity");
+  });
 });

@@ -10,6 +10,25 @@ afterEach(() => {
 });
 
 describe("Rai chat backend", () => {
+  it("responds to greetings conversationally without forcing an analytics tool", async () => {
+    const response = await runRaiChat({ message: "hi" });
+
+    expect(response.orchestrationMode).toBe("conversation");
+    expect(response.assistantText).toContain("Hi");
+    expect(response.assistantText).toContain("Rai");
+    expect(response.assistantText).not.toContain("continuity");
+    expect(response.report.toolName).toBe("no_tool_needed");
+    expect(response.toolCalls).toEqual([]);
+  });
+
+  it("explains Rai's role without calling analytics tools", async () => {
+    const response = await runRaiChat({ message: "who are you?" });
+
+    expect(response.orchestrationMode).toBe("conversation");
+    expect(response.report.toolName).toBe("no_tool_needed");
+    expect(response.assistantText).toContain("pharmacy intelligence assistant");
+  });
+
   it("keeps Rai functional through deterministic tools when OpenAI is not configured", async () => {
     process.env.OPENAI_API_KEY = "";
 

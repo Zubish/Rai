@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import { runRaiAnalytics, type RaiAnalyticsDataSource } from "../src/lib/analyticsEngine.js";
+import { classifyRaiConversation, createRaiConversationReport } from "../src/lib/raiConversation.js";
 import { parseRaiQuestion } from "../src/lib/intentParser.js";
 import type { RaiReport } from "../src/lib/types.js";
 import {
@@ -24,7 +25,7 @@ export type RaiChatResponse = {
   sessionId?: string;
   assistantText: string;
   report: RaiReport;
-  orchestrationMode: "openai_tools" | "gemini_tools" | "deterministic_fallback";
+  orchestrationMode: "openai_tools" | "gemini_tools" | "deterministic_fallback" | "conversation";
   model?: string;
   toolCalls: Array<{ name: string; arguments: RaiToolCallArgs }>;
 };
@@ -34,6 +35,11 @@ export async function runRaiChat(request: RaiChatRequest): Promise<RaiChatRespon
   const message = request.message.trim();
   if (!message) {
     return deterministicResponse("Ask Rai a business, inventory, forecasting, or profit question.");
+  }
+
+  const conversation = classifyRaiConversation(message);
+  if (conversation.kind !== "analytics") {
+    return conversationResponse(conversation);
   }
 
   const { dataSource, warning } = await getLiveDataSource(request);
@@ -62,6 +68,17 @@ export async function runRaiChat(request: RaiChatRequest): Promise<RaiChatRespon
       }
     };
   }
+}
+
+function conversationResponse(conversation: ReturnType<typeof classifyRaiConversation>): RaiChatResponse {
+  const report = createRaiConversationReport(conversation);
+
+  return {
+    assistantText: report.directAnswer,
+    report,
+    orchestrationMode: "conversation",
+    toolCalls: []
+  };
 }
 
 async function runGeminiResponse(

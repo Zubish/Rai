@@ -211,12 +211,17 @@ export const raiCapabilities: RaiCapability[] = [
 export function matchRaiCapability(question: string): RaiCapability | null {
   const lower = question.toLowerCase();
   const scored = raiCapabilities
-    .map((capability) => ({
-      capability,
-      score:
-        capability.triggerTerms.reduce((total, term) => total + (lower.includes(term) ? term.length : 0), 0) +
-        (capability.supported ? 0 : 100)
-    }))
+    .map((capability) => {
+      const baseScore = capability.triggerTerms.reduce(
+        (total, term) => total + (lower.includes(term) ? term.length : 0),
+        0
+      );
+
+      return {
+        capability,
+        score: baseScore > 0 ? baseScore + (capability.supported ? 0 : 100) : 0
+      };
+    })
     .filter((item) => item.score > 0)
     .sort((a, b) => b.score - a.score);
 

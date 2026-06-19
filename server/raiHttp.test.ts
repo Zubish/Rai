@@ -72,6 +72,21 @@ describe("Rai HTTP API", () => {
     expect(payload.data.report.directAnswer).toContain("Amlodipine");
   });
 
+  it("answers greetings through the conversation layer", async () => {
+    const response = await fetch(`${baseUrl}/api/rai/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: "hi" })
+    });
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(payload.ok).toBe(true);
+    expect(payload.data.orchestrationMode).toBe("conversation");
+    expect(payload.data.report.toolName).toBe("no_tool_needed");
+    expect(payload.data.assistantText).not.toContain("continuity");
+  });
+
   it("rejects invalid methods and malformed requests", async () => {
     const methodResponse = await fetch(`${baseUrl}/api/rai/chat`);
     expect(methodResponse.status).toBe(405);

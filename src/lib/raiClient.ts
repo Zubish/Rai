@@ -1,12 +1,13 @@
 import { runRaiAnalytics } from "./analyticsEngine";
 import { parseRaiQuestion } from "./intentParser";
+import { classifyRaiConversation, createRaiConversationReport } from "./raiConversation";
 import type { RaiReport } from "./types";
 
 export type RaiClientResponse = {
   sessionId?: string;
   assistantText: string;
   report: RaiReport;
-  orchestrationMode: "openai_tools" | "gemini_tools" | "deterministic_fallback" | "client_fallback";
+  orchestrationMode: "openai_tools" | "gemini_tools" | "deterministic_fallback" | "conversation" | "client_fallback";
   model?: string;
 };
 
@@ -46,14 +47,19 @@ export async function askRaiBackend(
 
     return payload.data;
   } catch {
-    const report = await runRaiAnalytics(parseRaiQuestion(message));
+    const conversation = classifyRaiConversation(message);
+    const report =
+      conversation.kind === "analytics"
+        ? await runRaiAnalytics(parseRaiQuestion(message))
+        : createRaiConversationReport(conversation);
+
     return {
       assistantText: report.directAnswer,
       report: {
         ...report,
         warnings: [...report.warnings, "Rai API was unavailable, so the local deterministic fallback answered."]
       },
-      orchestrationMode: "client_fallback"
+      orchestrationMode: conversation.kind === "analytics" ? "client_fallback" : "conversation"
     };
   }
 }
