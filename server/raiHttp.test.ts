@@ -7,9 +7,13 @@ import { handleRaiApiRequest } from "./raiHttp";
 let server: ReturnType<typeof createServer>;
 let baseUrl: string;
 const originalApiKey = process.env.OPENAI_API_KEY;
+const originalGeminiKey = process.env.GEMINI_API_KEY;
+const originalProvider = process.env.RAI_AI_PROVIDER;
 
 beforeEach(async () => {
   process.env.OPENAI_API_KEY = "";
+  process.env.GEMINI_API_KEY = "";
+  process.env.RAI_AI_PROVIDER = "openai";
   server = createServer(async (request, response) => {
     const handled = await handleRaiApiRequest(request, response);
     if (!handled) {
@@ -27,6 +31,8 @@ beforeEach(async () => {
 
 afterEach(async () => {
   restoreEnv("OPENAI_API_KEY", originalApiKey);
+  restoreEnv("GEMINI_API_KEY", originalGeminiKey);
+  restoreEnv("RAI_AI_PROVIDER", originalProvider);
   await new Promise<void>((resolve, reject) => {
     server.close((error) => (error ? reject(error) : resolve()));
   });
@@ -42,7 +48,9 @@ describe("Rai HTTP API", () => {
     expect(payload).toMatchObject({
       ok: true,
       service: "rai-api",
-      openaiConfigured: false
+      aiProvider: "openai",
+      openaiConfigured: false,
+      geminiConfigured: false
     });
     expect(JSON.stringify(payload)).not.toContain("OPENAI_API_KEY");
   });

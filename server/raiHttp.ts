@@ -1,5 +1,12 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { getOpenAiModel, isOpenAiConfigured, loadRaiEnvironment } from "./env.js";
+import {
+  getGeminiModel,
+  getOpenAiModel,
+  getRaiAiProvider,
+  isGeminiConfigured,
+  isOpenAiConfigured,
+  loadRaiEnvironment
+} from "./env.js";
 import {
   isDatabaseConfigured,
   listLibraryItems,
@@ -24,10 +31,12 @@ export async function handleRaiApiRequest(
     writeJson(response, 200, {
       ok: true,
       service: "rai-api",
+      aiProvider: getRaiAiProvider(),
       openaiConfigured: isOpenAiConfigured(),
+      geminiConfigured: isGeminiConfigured(),
       databaseConfigured: isDatabaseConfigured(),
       rxledgerConfigured: getRxLedgerConnectionStatus().configured,
-      model: getOpenAiModel()
+      model: getRaiAiProvider() === "gemini" ? getGeminiModel() : getOpenAiModel()
     });
     return true;
   }

@@ -26,8 +26,11 @@ The schema has been created for:
 Add these in Vercel Project Settings > Environment Variables for Production, Preview, and Development:
 
 - `POSTGRES_URL`: Neon pooled connection string.
+- `RAI_AI_PROVIDER`: AI provider for Rai orchestration. Use `openai`, `gemini`, or `deterministic`.
 - `OPENAI_API_KEY`: OpenAI API key for Rai tool orchestration.
 - `OPENAI_MODEL`: Optional; defaults to `gpt-5.4-mini`.
+- `GEMINI_API_KEY`: Google Gemini API key for Rai tool orchestration.
+- `GEMINI_MODEL`: Optional; defaults to `gemini-2.5-flash`.
 - `RXLEDGER_API_BASE_URL`: Base URL for the approved RxLedger API.
 - `RXLEDGER_API_KEY`: Read-only API token issued by RxLedger for Rai.
 - `RXLEDGER_ANALYTICS_SNAPSHOT_PATH`: Optional; defaults to `/api/rai/analytics-snapshot`.
@@ -35,6 +38,10 @@ Add these in Vercel Project Settings > Environment Variables for Production, Pre
 - `RXLEDGER_BRANCH_IDS`: Comma-separated branch ids, for example `main,branch-2`.
 
 `DATABASE_URL` may also be set as a fallback alias for `POSTGRES_URL`.
+
+To use Gemini as Rai's reasoning layer, set `RAI_AI_PROVIDER=gemini` and add `GEMINI_API_KEY`.
+Keep Gemini and OpenAI keys server-side only in Vercel; never commit them or expose them to the browser.
+Rai still uses deterministic tools and RxLedger snapshots as the source of truth, so the AI provider only selects tools and writes the final explanation.
 
 ## Verification
 
@@ -50,7 +57,9 @@ Expected:
 {
   "ok": true,
   "service": "rai-api",
+  "aiProvider": "gemini",
   "openaiConfigured": true,
+  "geminiConfigured": true,
   "databaseConfigured": true,
   "rxledgerConfigured": true
 }

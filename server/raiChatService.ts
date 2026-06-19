@@ -2,7 +2,14 @@ import OpenAI from "openai";
 import { runRaiAnalytics, type RaiAnalyticsDataSource } from "../src/lib/analyticsEngine.js";
 import { parseRaiQuestion } from "../src/lib/intentParser.js";
 import type { RaiReport } from "../src/lib/types.js";
-import { getOpenAiModel, isOpenAiConfigured, loadRaiEnvironment } from "./env.js";
+import {
+  getOpenAiModel,
+  getRaiAiProvider,
+  isGeminiConfigured,
+  isOpenAiConfigured,
+  loadRaiEnvironment
+} from "./env.js";
+import { runGeminiToolOrchestration } from "./raiGeminiOrchestration.js";
 import { executeRaiTool, raiOpenAiTools, type RaiToolCallArgs } from "./raiToolRegistry.js";
 import { getRxLedgerAnalyticsDataSource } from "./rxledgerApiConnector.js";
 
@@ -17,7 +24,7 @@ export type RaiChatResponse = {
   sessionId?: string;
   assistantText: string;
   report: RaiReport;
-  orchestrationMode: "openai_tools" | "deterministic_fallback";
+  orchestrationMode: "openai_tools" | "gemini_tools" | "deterministic_fallback";
   model?: string;
   toolCalls: Array<{ name: string; arguments: RaiToolCallArgs }>;
 };
@@ -30,13 +37,17 @@ export async function runRaiChat(request: RaiChatRequest): Promise<RaiChatRespon
   }
 
   const { dataSource, warning } = await getLiveDataSource(request);
+  const provider = getRaiAiProvider();
 
-  if (!isOpenAiConfigured()) {
+  if (provider === "deterministic") {
     return deterministicResponse(message, dataSource, warning);
   }
 
   try {
-    const response = await runOpenAiToolOrchestration(message, dataSource);
+    const response =
+      provider === "gemini"
+        ? await runGeminiResponse(message, dataSource)
+        : await runOpenAiResponse(message, dataSource);
     return warning ? appendWarning(response, warning) : response;
   } catch (error) {
     const fallback = await deterministicResponse(message, dataSource, warning);
@@ -46,11 +57,33 @@ export async function runRaiChat(request: RaiChatRequest): Promise<RaiChatRespon
         ...fallback.report,
         warnings: [
           ...fallback.report.warnings,
-          "OpenAI orchestration was unavailable, so Rai used deterministic local analytics."
+          `${provider === "gemini" ? "Gemini" : "OpenAI"} orchestration was unavailable, so Rai used deterministic local analytics.`
         ]
       }
     };
   }
+}
+
+async function runGeminiResponse(
+  message: string,
+  dataSource?: RaiAnalyticsDataSource
+): Promise<RaiChatResponse> {
+  if (!isGeminiConfigured()) {
+    throw new Error("Gemini is not configured.");
+  }
+
+  return runGeminiToolOrchestration(message, dataSource);
+}
+
+async function runOpenAiResponse(
+  message: string,
+  dataSource?: RaiAnalyticsDataSource
+): Promise<RaiChatResponse> {
+  if (!isOpenAiConfigured()) {
+    throw new Error("OpenAI is not configured.");
+  }
+
+  return runOpenAiToolOrchestration(message, dataSource);
 }
 
 async function runOpenAiToolOrchestration(
