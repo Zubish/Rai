@@ -17,7 +17,8 @@ export type RaiIntentName =
   | "demand_forecast"
   | "profit_maximization"
   | "cash_tied_inventory"
-  | "business_health_review";
+  | "business_health_review"
+  | "rxledger_capability_gap";
 
 export type BaseIntent = {
   intent: RaiIntentName;
@@ -76,6 +77,15 @@ export type BusinessAdvisoryIntent = BaseIntent & {
   intent: "profit_maximization" | "cash_tied_inventory" | "business_health_review";
 };
 
+export type RxLedgerCapabilityGapIntent = BaseIntent & {
+  intent: "rxledger_capability_gap";
+  question: string;
+  capabilityId: string;
+  capabilityLabel: string;
+  requiredData: string[];
+  recommendedApiCapabilities: string[];
+};
+
 export type UnsupportedIntent = {
   intent: "unsupported";
   reason: string;
@@ -91,6 +101,7 @@ export type RaiIntent =
   | BudgetRestockPlanIntent
   | DemandForecastIntent
   | BusinessAdvisoryIntent
+  | RxLedgerCapabilityGapIntent
   | UnsupportedIntent;
 
 export type MetricCard = {

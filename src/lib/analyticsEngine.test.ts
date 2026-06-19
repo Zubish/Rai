@@ -85,4 +85,36 @@ describe("runRaiAnalytics", () => {
     expect(report.directAnswer).toContain("Rai cannot run that request");
     expect(report.metricCards).toEqual([]);
   });
+
+  it("maps broad continuity questions to required RxLedger data instead of guessing", async () => {
+    const report = await ask(
+      "Which drugs do we frequently have in continuity but we don't buy so often that are worth keeping?"
+    );
+
+    expect(report.status).toBe("unsupported");
+    expect(report.toolName).toBe("answer_rxledger_question");
+    expect(report.title).toBe("Continuity demand gap");
+    expect(report.directAnswer).toContain("Rai understands this as a continuity demand gap question");
+    expect(report.table.rows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ requiredData: "continuity or owed medication records" }),
+        expect.objectContaining({ requiredData: "purchase history" })
+      ])
+    );
+    expect(report.warnings[0]).toContain("required read-only analytics data");
+  });
+
+  it("maps approval and payment questions to the missing RxLedger API contract", async () => {
+    const report = await ask("How many approval sales did Lagos branch process yesterday?");
+
+    expect(report.status).toBe("unsupported");
+    expect(report.toolName).toBe("answer_rxledger_question");
+    expect(report.title).toBe("Approval and payment analysis");
+    expect(report.table.rows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ requiredData: "approval records" }),
+        expect.objectContaining({ requiredData: "payment method" })
+      ])
+    );
+  });
 });

@@ -6,7 +6,7 @@ export type RaiClientResponse = {
   sessionId?: string;
   assistantText: string;
   report: RaiReport;
-  orchestrationMode: "openai_tools" | "deterministic_fallback" | "client_fallback";
+  orchestrationMode: "openai_tools" | "gemini_tools" | "deterministic_fallback" | "client_fallback";
   model?: string;
 };
 

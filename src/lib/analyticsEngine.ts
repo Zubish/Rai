@@ -10,6 +10,7 @@ import type {
   MedicationSalesQuantityIntent,
   ReportTable,
   RiskIntent,
+  RxLedgerCapabilityGapIntent,
   UniquePatientsIntent
 } from "./types.js";
 
@@ -72,6 +73,8 @@ export async function runRaiAnalytics(
       return cashTiedInventoryReport();
     case "business_health_review":
       return businessHealthReviewReport();
+    case "rxledger_capability_gap":
+      return rxledgerCapabilityGapReport(intent);
   }
   } finally {
     activeAnalyticsDataSource = previousDataSource;
@@ -741,6 +744,55 @@ function businessHealthReviewReport(): RaiReport {
   });
 }
 
+function rxledgerCapabilityGapReport(intent: RxLedgerCapabilityGapIntent): RaiReport {
+  const rows = intent.requiredData.map((field, index) => ({
+    requiredData: field,
+    status: "Required from RxLedger",
+    recommendedApiCapability: intent.recommendedApiCapabilities[index] ?? intent.recommendedApiCapabilities[0] ?? "Add to analytics snapshot"
+  }));
+
+  return {
+    status: "unsupported",
+    id: `capability-gap-${intent.capabilityId}`,
+    intentLabel: "RxLedger capability mapping",
+    title: intent.capabilityLabel,
+    directAnswer:
+      `Rai understands this as ${articleFor(intent.capabilityLabel)} ${intent.capabilityLabel.toLowerCase()} question, but the required RxLedger data is not exposed to Rai yet.`,
+    summary:
+      "Rai mapped the question to a pharmacy intelligence capability and stopped before inventing numbers. The next step is to expose the required read-only RxLedger analytics fields through the approved API.",
+    toolName: "answer_rxledger_question",
+    metricCards: [
+      { label: "Matched capability", value: intent.capabilityLabel, helper: "question understood" },
+      { label: "Data status", value: "Missing", helper: "no guessed numbers" },
+      { label: "Branch scope", value: intent.branchIds.join(", "), helper: intent.dateRange.label }
+    ],
+    chartData: [],
+    table: table(["requiredData", "status", "recommendedApiCapability"], rows),
+    assumptions: [
+      `Question: ${intent.question}`,
+      `Date range: ${intent.dateRange.startDate} to ${intent.dateRange.endDate}.`,
+      `Branch scope: ${intent.branchIds.join(", ")}.`,
+      `Source system is represented by ${activeAnalyticsDataSource.sourceLabel ?? "the active analytics adapter"}.`,
+      "Rai is read-only and must not infer missing RxLedger numbers."
+    ],
+    warnings: [
+      "Rai cannot provide a numeric answer until RxLedger exposes the required read-only analytics data."
+    ],
+    suggestedActions: [
+      "Add the listed read-only fields to the RxLedger analytics snapshot or a dedicated endpoint.",
+      "Ask a narrower question using currently available sales, inventory, profit, stockout, expiry, or reorder data.",
+      "Use this capability mapping as the API contract for the next RxLedger integration slice."
+    ],
+    confidence: "high",
+    agentTrace: [
+      "Rai Orchestrator classified the broad RxLedger question.",
+      "Capability Router matched the question to the RxLedger capability map.",
+      "AI Safety Agent blocked numeric guessing because required data is missing.",
+      "API Architect Agent listed the read-only RxLedger data needed for this answer."
+    ]
+  };
+}
+
 function simpleRiskReport(
   id: string,
   title: string,
@@ -872,6 +924,10 @@ function table(keys: string[], rows: Array<Record<string, string | number>>): Re
 
 function labelize(key: string): string {
   return key.replace(/([A-Z])/g, " $1").replace(/^./, (letter) => letter.toUpperCase());
+}
+
+function articleFor(value: string): "a" | "an" {
+  return /^[aeiou]/i.test(value.trim()) ? "an" : "a";
 }
 
 function sum(values: number[]): number {

@@ -75,6 +75,63 @@ describe("Rai Gemini orchestration", () => {
       name: "get_medication_sales_quantity"
     });
   });
+
+  it("lets Gemini route broad RxLedger questions without hallucinating missing data", async () => {
+    globalThis.fetch = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          candidates: [
+            {
+              content: {
+                parts: [
+                  {
+                    functionCall: {
+                      name: "answer_rxledger_question",
+                      args: {
+                        question:
+                          "Which drugs do patients request in continuity but we rarely purchase?"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        })
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          candidates: [
+            {
+              content: {
+                parts: [
+                  {
+                    text:
+                      "Rai understands this as continuity demand analysis, but RxLedger must expose continuity and purchase history first."
+                  }
+                ]
+              }
+            }
+          ]
+        })
+      } as Response);
+
+    const { runRaiChat } = await import("./raiChatService");
+    const response = await runRaiChat({
+      message: "Which drugs do patients request in continuity but we rarely purchase?"
+    });
+
+    expect(response.orchestrationMode).toBe("gemini_tools");
+    expect(response.report.toolName).toBe("answer_rxledger_question");
+    expect(response.report.title).toBe("Continuity demand gap");
+    expect(response.report.warnings[0]).toContain("required read-only analytics data");
+    expect(response.toolCalls[0]).toMatchObject({
+      name: "answer_rxledger_question"
+    });
+  });
 });
 
 function restoreEnv(name: string, value: string | undefined) {

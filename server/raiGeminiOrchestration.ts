@@ -41,7 +41,11 @@ const raiGeminiTools: GeminiFunctionDeclaration[] = [
   tool("forecast_category_demand", "Forecast medicine category demand over a planning window."),
   tool("find_profit_maximization_levers", "Find practical profit improvement actions."),
   tool("find_cash_tied_in_inventory", "Find cash tied down in inventory."),
-  tool("summarize_business_health", "Summarize owner-level pharmacy business health.")
+  tool("summarize_business_health", "Summarize owner-level pharmacy business health."),
+  tool(
+    "answer_rxledger_question",
+    "Route a broad RxLedger question when no specialized approved tool can answer safely; returns missing data/API requirements instead of guessing."
+  )
 ];
 
 export async function runGeminiToolOrchestration(
@@ -61,6 +65,7 @@ export async function runGeminiToolOrchestration(
           text: [
             "You are Rai, a pharmacy business intelligence orchestrator.",
             "Choose exactly one approved function for the user's pharmacy analytics question.",
+            "Prefer the most specific function. Use answer_rxledger_question only when no specialized function can answer safely.",
             "Never invent pharmacy metrics. The function result is the source of truth.",
             "Do not mutate stock, price, patient, dispensing, or RxLedger data."
           ].join(" ")
@@ -91,6 +96,7 @@ export async function runGeminiToolOrchestration(
           text: [
             "Write a concise Rai answer for the user.",
             "Use only the provided tool output and preserve all numbers exactly.",
+            "If the tool output says required RxLedger data is missing, explain the missing data instead of pretending to answer numerically.",
             "Mention the practical recommendation and the most important assumption.",
             "Do not add facts that are not present in the tool result."
           ].join(" ")

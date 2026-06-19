@@ -1,21 +1,7 @@
 import { runRaiAnalytics, type RaiAnalyticsDataSource } from "../src/lib/analyticsEngine.js";
 import { parseRaiQuestion } from "../src/lib/intentParser.js";
+import { matchRaiCapability, type RaiToolName } from "../src/lib/raiCapabilities.js";
 import type { RaiDateRange, RaiIntent, RaiReport } from "../src/lib/types.js";
-
-type RaiToolName =
-  | "get_unique_patients_on_medication"
-  | "get_medication_sales_quantity"
-  | "get_medication_category_usage"
-  | "get_sales_profit_summary"
-  | "get_reorder_forecast"
-  | "get_stockout_risk"
-  | "get_expiry_risk"
-  | "get_slow_moving_stock"
-  | "build_restock_budget_plan"
-  | "forecast_category_demand"
-  | "find_profit_maximization_levers"
-  | "find_cash_tied_in_inventory"
-  | "summarize_business_health";
 
 export type RaiToolCallArgs = {
   question?: string;
@@ -53,7 +39,11 @@ export const raiOpenAiTools = [
   tool("forecast_category_demand", "Forecast medicine category demand over a planning window."),
   tool("find_profit_maximization_levers", "Find practical profit improvement actions."),
   tool("find_cash_tied_in_inventory", "Find cash tied down in inventory."),
-  tool("summarize_business_health", "Summarize owner-level pharmacy business health.")
+  tool("summarize_business_health", "Summarize owner-level pharmacy business health."),
+  tool(
+    "answer_rxledger_question",
+    "Route a broad RxLedger question. Use this only when no specialized tool can answer safely; it returns the required data or missing API capability instead of guessing."
+  )
 ] as const;
 
 export async function executeRaiTool(
@@ -188,6 +178,8 @@ function intentForTool(name: RaiToolName, args: RaiToolCallArgs, question: strin
       return { intent: "cash_tied_inventory", dateRange: defaultDateRange, branchIds: mainBranch };
     case "summarize_business_health":
       return { intent: "business_health_review", dateRange: defaultDateRange, branchIds: mainBranch };
+    case "answer_rxledger_question":
+      return capabilityGapIntent(question);
   }
 }
 
@@ -209,10 +201,37 @@ function toolMatchesIntent(name: RaiToolName, intent: RaiIntent["intent"]): bool
     forecast_category_demand: "demand_forecast",
     find_profit_maximization_levers: "profit_maximization",
     find_cash_tied_in_inventory: "cash_tied_inventory",
-    summarize_business_health: "business_health_review"
+    summarize_business_health: "business_health_review",
+    answer_rxledger_question: "rxledger_capability_gap"
   };
 
   return mapping[name] === intent;
+}
+
+function capabilityGapIntent(question: string): RaiIntent {
+  const capability = matchRaiCapability(question);
+  if (!capability) {
+    return {
+      intent: "unsupported",
+      reason:
+        "Rai could not map this request to an approved RxLedger intelligence capability. Ask a pharmacy operations, sales, inventory, patient, branch, staff, approval, report, or forecasting question."
+    };
+  }
+
+  if (capability.supported && capability.intentName) {
+    return intentForTool(capability.toolName, {}, question);
+  }
+
+  return {
+    intent: "rxledger_capability_gap",
+    question,
+    capabilityId: capability.id,
+    capabilityLabel: capability.label,
+    requiredData: capability.requiredData,
+    recommendedApiCapabilities: capability.recommendedApiCapabilities,
+    dateRange: defaultDateRange,
+    branchIds: mainBranch
+  };
 }
 
 function medicationFromQuestion(question: string): string | null {

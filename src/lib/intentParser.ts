@@ -1,4 +1,5 @@
 import type { RaiIntent } from "./types.js";
+import { matchRaiCapability } from "./raiCapabilities.js";
 import { parseRaiQuestionScope } from "./raiScope.js";
 
 const KNOWN_MEDICATIONS = ["Exforge 10/160", "Amaryl 2mg", "Aprovel"];
@@ -150,8 +151,22 @@ export function parseRaiQuestion(question: string, now?: Date): RaiIntent {
     };
   }
 
+  const capability = matchRaiCapability(normalized);
+  if (capability && !capability.supported) {
+    return {
+      intent: "rxledger_capability_gap",
+      question: normalized,
+      capabilityId: capability.id,
+      capabilityLabel: capability.label,
+      requiredData: capability.requiredData,
+      recommendedApiCapabilities: capability.recommendedApiCapabilities,
+      dateRange,
+      branchIds
+    };
+  }
+
   return unsupported(
-    "Rai MVP currently supports read-only analytics for medication usage, unique patient counts, profit, reorder, stockout, expiry, and slow-moving stock reports."
+    "Rai can only answer questions grounded in approved RxLedger analytics data. Ask about sales, inventory, patients, branches, reports, forecasting, profit, continuity demand, approvals, staff activity, or refill follow-up."
   );
 }
 

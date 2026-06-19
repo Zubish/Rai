@@ -13,7 +13,10 @@ describe("Rai tool registry", () => {
     const reports = await Promise.all(
       raiOpenAiTools.map((tool) =>
         executeRaiTool(tool.name, {
-          question: "Give me a safe pharmacy business answer",
+          question:
+            tool.name === "answer_rxledger_question"
+              ? "Which drugs are frequently in continuity but rarely purchased?"
+              : "Give me a safe pharmacy business answer",
           medicationQuery: "Aprovel",
           category: "antihypertensive",
           budgetNaira: 500000,
@@ -23,7 +26,11 @@ describe("Rai tool registry", () => {
       )
     );
 
-    expect(reports.every((report) => report.status === "success")).toBe(true);
+    const genericRouterReport = reports.find((report) => report.toolName === "answer_rxledger_question");
+    const deterministicReports = reports.filter((report) => report.toolName !== "answer_rxledger_question");
+
+    expect(deterministicReports.every((report) => report.status === "success")).toBe(true);
+    expect(genericRouterReport?.status).toBe("unsupported");
     expect(new Set(reports.map((report) => report.toolName)).size).toBe(raiOpenAiTools.length);
   });
 
@@ -61,5 +68,20 @@ describe("Rai tool registry", () => {
 
     expect(report.toolName).toBe("forecast_category_demand");
     expect(report.title).toBe("All demand forecast");
+  });
+
+  it("routes broad RxLedger questions through the generic capability tool", async () => {
+    const report = await executeRaiTool("answer_rxledger_question", {
+      question: "Which staff processed the most approvals last week?"
+    });
+
+    expect(report.status).toBe("unsupported");
+    expect(report.toolName).toBe("answer_rxledger_question");
+    expect(report.title).toBe("Approval and payment analysis");
+    expect(report.suggestedActions).toEqual(
+      expect.arrayContaining([
+        "Use this capability mapping as the API contract for the next RxLedger integration slice."
+      ])
+    );
   });
 });
