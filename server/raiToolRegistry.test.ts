@@ -1,6 +1,16 @@
 // @vitest-environment node
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { executeRaiTool, raiOpenAiTools } from "./raiToolRegistry";
+
+const originalServiceUrl = process.env.RAI_ANALYTICS_SERVICE_URL;
+const originalFetch = globalThis.fetch;
+
+afterEach(() => {
+  globalThis.fetch = originalFetch;
+  if (originalServiceUrl === undefined) delete process.env.RAI_ANALYTICS_SERVICE_URL;
+  else process.env.RAI_ANALYTICS_SERVICE_URL = originalServiceUrl;
+  vi.restoreAllMocks();
+});
 
 describe("Rai tool registry", () => {
   it("defines strict OpenAI function tools", () => {
@@ -68,6 +78,48 @@ describe("Rai tool registry", () => {
 
     expect(report.toolName).toBe("forecast_category_demand");
     expect(report.title).toBe("All demand forecast");
+  });
+
+  it("uses the Python analytics service for demand history when configured", async () => {
+    process.env.RAI_ANALYTICS_SERVICE_URL = "http://127.0.0.1:8790";
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        model: "linear_trend",
+        horizonDays: 2,
+        forecast: [
+          { date: "2026-06-03", value: 12 },
+          { date: "2026-06-04", value: 14 }
+        ],
+        totalForecast: 26,
+        backtest: { mae: 1, observations: 2 },
+        warnings: ["Directional forecast"]
+      })
+    } as Response);
+
+    const report = await executeRaiTool(
+      "forecast_category_demand",
+      { question: "Forecast antihypertensive demand for 2 days", category: "antihypertensive", horizonDays: 2 },
+      {
+        medications: [
+          {
+            id: "med-1", name: "Aprovel", strength: "150mg", category: "antihypertensive",
+            unit: "tablets", costPerUnit: 1, sellingPricePerUnit: 2, currentStock: 10,
+            averageMonthlyUsage: 10, pendingOwedQuantity: 0, supplierLeadTimeDays: 2,
+            expiryRiskQuantity: 0, daysUntilStockout: 30, daysSinceLastSale: 1, stockValue: 10
+          }
+        ],
+        dispensedMedicationRecords: [
+          { transactionId: "1", patientId: "p1", medicationId: "med-1", quantity: 10, branchId: "main", dispensedAt: "2026-06-01", voided: false, returned: false },
+          { transactionId: "2", patientId: "p2", medicationId: "med-1", quantity: 11, branchId: "main", dispensedAt: "2026-06-02", voided: false, returned: false }
+        ],
+        sourceLabel: "RxLedger test aggregate"
+      }
+    );
+
+    expect(report.directAnswer).toContain("26 tablets");
+    expect(report.assumptions).toContain("Forecast model: linear_trend.");
+    expect(report.warnings).toContain("Directional forecast");
   });
 
   it("routes broad RxLedger questions through the generic capability tool", async () => {

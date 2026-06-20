@@ -1,4 +1,9 @@
 node_modules/
+.venv/
+analytics-service/.venv/
+__pycache__/
+.pytest_cache/
+*.egg-info/
 dist/
 coverage/
 test-results/

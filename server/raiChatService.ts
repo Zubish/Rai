@@ -1,7 +1,6 @@
 import OpenAI from "openai";
-import { runRaiAnalytics, type RaiAnalyticsDataSource } from "../src/lib/analyticsEngine.js";
+import { getMockAnalyticsDataSource, type RaiAnalyticsDataSource } from "../src/lib/analyticsEngine.js";
 import { classifyRaiConversation, createRaiConversationReport } from "../src/lib/raiConversation.js";
-import { parseRaiQuestion } from "../src/lib/intentParser.js";
 import type { RaiReport } from "../src/lib/types.js";
 import {
   getOpenAiModel,
@@ -11,7 +10,8 @@ import {
   loadRaiEnvironment
 } from "./env.js";
 import { runGeminiToolOrchestration } from "./raiGeminiOrchestration.js";
-import { executeRaiTool, raiOpenAiTools, type RaiToolCallArgs } from "./raiToolRegistry.js";
+import { createRaiOrchestrationGraph } from "./raiOrchestrationGraph.js";
+import { executeRaiQuestion, executeRaiTool, raiOpenAiTools, type RaiToolCallArgs } from "./raiToolRegistry.js";
 import { getRxLedgerAnalyticsDataSource } from "./rxledgerApiConnector.js";
 
 export type RaiChatRequest = {
@@ -37,12 +37,25 @@ export async function runRaiChat(request: RaiChatRequest): Promise<RaiChatRespon
     return deterministicResponse("Ask Rai a business, inventory, forecasting, or profit question.");
   }
 
-  const conversation = classifyRaiConversation(message);
-  if (conversation.kind !== "analytics") {
-    return conversationResponse(conversation);
+  const result = await raiOrchestrationGraph.invoke({ request });
+  if (!result.response) {
+    throw new Error("Rai orchestration completed without a response.");
   }
 
-  const { dataSource, warning } = await getLiveDataSource(request);
+  return {
+    ...result.response,
+    report: {
+      ...result.response.report,
+      agentTrace: [...result.trace, ...(result.response.report.agentTrace ?? [])]
+    }
+  };
+}
+
+async function runAnalyticsResponse(
+  message: string,
+  dataSource?: RaiAnalyticsDataSource,
+  warning?: string
+): Promise<RaiChatResponse> {
   const provider = getRaiAiProvider();
 
   if (provider === "deterministic") {
@@ -69,6 +82,12 @@ export async function runRaiChat(request: RaiChatRequest): Promise<RaiChatRespon
     };
   }
 }
+
+const raiOrchestrationGraph = createRaiOrchestrationGraph({
+  loadData: getLiveDataSource,
+  runConversation: conversationResponse,
+  runAnalytics: runAnalyticsResponse
+});
 
 function conversationResponse(conversation: ReturnType<typeof classifyRaiConversation>): RaiChatResponse {
   const report = createRaiConversationReport(conversation);
@@ -183,7 +202,7 @@ async function deterministicResponse(
   dataSource?: RaiAnalyticsDataSource,
   warning?: string
 ): Promise<RaiChatResponse> {
-  const report = await runRaiAnalytics(parseRaiQuestion(message), dataSource);
+  const report = await executeRaiQuestion(message, dataSource);
 
   return {
     assistantText: report.directAnswer,
@@ -199,9 +218,17 @@ async function getLiveDataSource(request: RaiChatRequest): Promise<{
 }> {
   try {
     const dataSource = await getRxLedgerAnalyticsDataSource(request);
-    return { dataSource };
+    if (dataSource) {
+      return { dataSource };
+    }
+
+    return {
+      dataSource: getMockAnalyticsDataSource(),
+      warning: "Live RxLedger API data was unavailable, so Rai used the approved local analytics fixture."
+    };
   } catch {
     return {
+      dataSource: getMockAnalyticsDataSource(),
       warning: "Live RxLedger API data was unavailable, so Rai used the approved local analytics fixture."
     };
   }

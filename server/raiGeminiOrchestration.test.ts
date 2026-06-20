@@ -8,6 +8,8 @@ const originalGeminiModel = process.env.GEMINI_MODEL;
 const originalOpenAiKey = process.env.OPENAI_API_KEY;
 
 beforeEach(() => {
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date("2026-06-19T12:00:00Z"));
   process.env.RAI_AI_PROVIDER = "gemini";
   process.env.GEMINI_API_KEY = "test-gemini-key";
   process.env.GEMINI_MODEL = "gemini-2.5-flash";
@@ -15,6 +17,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   globalThis.fetch = originalFetch;
   restoreEnv("RAI_AI_PROVIDER", originalProvider);
   restoreEnv("GEMINI_API_KEY", originalGeminiKey);

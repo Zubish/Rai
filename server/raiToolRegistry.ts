@@ -2,6 +2,10 @@ import { runRaiAnalytics, type RaiAnalyticsDataSource } from "../src/lib/analyti
 import { parseRaiQuestion } from "../src/lib/intentParser.js";
 import { matchRaiCapability, type RaiToolName } from "../src/lib/raiCapabilities.js";
 import type { RaiDateRange, RaiIntent, RaiReport } from "../src/lib/types.js";
+import {
+  getAnalyticsServiceConfig,
+  requestDemandForecast
+} from "./raiAnalyticsServiceClient.js";
 
 export type RaiToolCallArgs = {
   question?: string;
@@ -60,11 +64,131 @@ export async function executeRaiTool(
 
   const question = args.question?.trim();
   const parsed = question ? parseRaiQuestion(question) : null;
-  if (parsed && parsed.intent !== "unsupported" && toolMatchesIntent(name, parsed.intent)) {
-    return runRaiAnalytics(parsed, dataSource);
+  const intent = parsed && parsed.intent !== "unsupported" && toolMatchesIntent(name, parsed.intent)
+    ? parsed
+    : intentForTool(name, args, question ?? "");
+
+  if (intent.intent === "demand_forecast" && dataSource) {
+    const advanced = await runAdvancedDemandForecast(
+      intent.category,
+      intent.horizonDays,
+      dataSource
+    );
+    if (advanced.report) {
+      return advanced.report;
+    }
+
+    const baseline = await runRaiAnalytics(intent, dataSource);
+    return advanced.warning
+      ? { ...baseline, warnings: [...baseline.warnings, advanced.warning] }
+      : baseline;
   }
 
-  return runRaiAnalytics(intentForTool(name, args, question ?? ""), dataSource);
+  return runRaiAnalytics(intent, dataSource);
+}
+
+export async function executeRaiQuestion(
+  question: string,
+  dataSource?: RaiAnalyticsDataSource
+): Promise<RaiReport> {
+  const intent = parseRaiQuestion(question);
+  if (intent.intent !== "demand_forecast" || !dataSource) {
+    return runRaiAnalytics(intent, dataSource);
+  }
+
+  const advanced = await runAdvancedDemandForecast(intent.category, intent.horizonDays, dataSource);
+  if (advanced.report) return advanced.report;
+
+  const baseline = await runRaiAnalytics(intent, dataSource);
+  return advanced.warning
+    ? { ...baseline, warnings: [...baseline.warnings, advanced.warning] }
+    : baseline;
+}
+
+async function runAdvancedDemandForecast(
+  category: string,
+  horizonDays: number,
+  dataSource: RaiAnalyticsDataSource
+): Promise<{ report?: RaiReport; warning?: string }> {
+  const config = getAnalyticsServiceConfig();
+  if (!config) return {};
+
+  const medicationIds = new Set(
+    dataSource.medications
+      .filter((medication) => category === "all" || medication.category === category)
+      .map((medication) => medication.id)
+  );
+  const totalsByDate = new Map<string, number>();
+  dataSource.dispensedMedicationRecords
+    .filter((record) => medicationIds.has(record.medicationId) && !record.voided && !record.returned)
+    .forEach((record) => {
+      const date = record.dispensedAt.slice(0, 10);
+      totalsByDate.set(date, (totalsByDate.get(date) ?? 0) + record.quantity);
+    });
+  const series = [...totalsByDate.entries()]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([date, value]) => ({ date, value }));
+
+  if (series.length < 2) {
+    return {
+      warning: "Advanced forecasting was skipped because fewer than two dated demand observations were available."
+    };
+  }
+
+  try {
+    const result = await requestDemandForecast({ series, horizonDays }, config);
+    const categoryLabel = category === "all" ? "All" : category.charAt(0).toUpperCase() + category.slice(1);
+    const units = new Set(
+      dataSource.medications
+        .filter((medication) => medicationIds.has(medication.id))
+        .map((medication) => medication.unit)
+    );
+    const unitLabel = units.size === 1 ? [...units][0] : "units";
+    return {
+      report: {
+        status: "success",
+        id: "advanced-demand-forecast",
+        intentLabel: "Advanced demand forecast",
+        title: `${categoryLabel} demand forecast`,
+        directAnswer: `Rai forecasts ${new Intl.NumberFormat("en-NG").format(result.totalForecast)} ${unitLabel} of ${category} demand over the next ${horizonDays} days.`,
+        summary: "Rai sent an aggregated daily demand series to its deterministic Python analytics service, fitted a numerical trend, and backtested the fit before returning this forecast.",
+        toolName: "forecast_category_demand",
+        metricCards: [
+          { label: "Forecast demand", value: `${new Intl.NumberFormat("en-NG").format(result.totalForecast)} ${unitLabel}`, helper: `${horizonDays}-day horizon` },
+          { label: "Backtest MAE", value: String(result.backtest.mae), helper: "lower is better" },
+          { label: "Observations", value: String(result.backtest.observations), helper: dataSource.sourceLabel ?? "approved data source" }
+        ],
+        chartData: result.forecast.map((point) => ({ label: point.date, value: point.value })),
+        table: {
+          columns: [
+            { key: "date", label: "Date" },
+            { key: "forecastDemand", label: "Forecast demand" }
+          ],
+          rows: result.forecast.map((point) => ({ date: point.date, forecastDemand: point.value }))
+        },
+        assumptions: [
+          `Forecast model: ${result.model}.`,
+          `Input contains ${series.length} aggregated daily observations.`,
+          "Voided and returned dispensing records are excluded.",
+          "The analytics service receives aggregate dates and quantities only."
+        ],
+        warnings: result.warnings,
+        suggestedActions: [
+          "Compare forecast demand with current stock and supplier lead time.",
+          "Review the backtest error before committing a purchasing budget."
+        ],
+        confidence: result.backtest.observations >= 30 ? "high" : "medium",
+        agentTrace: [
+          "Data Analysis Agent aggregated approved dispensing history by day.",
+          "Forecasting Agent fitted and backtested the deterministic numerical model."
+        ]
+      }
+    };
+  } catch {
+    return {
+      warning: "The advanced analytics service was unavailable, so Rai used its deterministic baseline forecast."
+    };
+  }
 }
 
 function tool(name: RaiToolName, description: string) {

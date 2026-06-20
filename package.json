@@ -8,12 +8,15 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview --host 127.0.0.1",
     "server:dev": "tsx server/index.ts",
+    "analytics:dev": "cd analytics-service && .venv\\Scripts\\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8790",
+    "analytics:test": "cd analytics-service && .venv\\Scripts\\python.exe -m pytest -q tests",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
     "e2e": "playwright test"
   },
   "dependencies": {
+    "@langchain/langgraph": "^1.4.4",
     "@neondatabase/serverless": "^1.1.0",
     "dotenv": "^17.4.2",
     "lucide-react": "^0.468.0",

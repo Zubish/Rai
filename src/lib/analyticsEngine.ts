@@ -32,6 +32,10 @@ const mockAnalyticsDataSource: RaiAnalyticsDataSource = {
   sourceLabel: "approved mock RxLedger analytics adapter"
 };
 
+export function getMockAnalyticsDataSource(): RaiAnalyticsDataSource {
+  return mockAnalyticsDataSource;
+}
+
 let activeAnalyticsDataSource = mockAnalyticsDataSource;
 
 export async function runRaiAnalytics(

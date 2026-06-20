@@ -14,6 +14,7 @@ import {
   saveLibraryItem
 } from "./raiPersistence.js";
 import { getRxLedgerConnectionStatus } from "./rxledgerApiConnector.js";
+import { getAnalyticsServiceConfig } from "./raiAnalyticsServiceClient.js";
 import { checkRateLimit } from "./rateLimit.js";
 import { runRaiChat } from "./raiChatService.js";
 import { validateRaiChatBody } from "./requestValidation.js";
@@ -36,6 +37,7 @@ export async function handleRaiApiRequest(
       geminiConfigured: isGeminiConfigured(),
       databaseConfigured: isDatabaseConfigured(),
       rxledgerConfigured: getRxLedgerConnectionStatus().configured,
+      analyticsServiceConfigured: Boolean(getAnalyticsServiceConfig()),
       model: getRaiAiProvider() === "gemini" ? getGeminiModel() : getOpenAiModel()
     });
     return true;
