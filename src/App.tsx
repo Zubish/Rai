@@ -46,6 +46,7 @@ import {
 import { askRaiBackend, saveRaiLibraryItem } from "./lib/raiClient";
 import type { RaiClientResponse } from "./lib/raiClient";
 import type { RaiReport } from "./lib/types";
+import { LandingPage } from "./components/LandingPage";
 import "./styles.css";
 import type { LucideIcon } from "lucide-react";
 
@@ -132,6 +133,7 @@ const pulseMetrics = [
 ];
 
 export default function App() {
+  const [showPublicLanding, setShowPublicLanding] = useState(true);
   const [activeView, setActiveView] = useState<ViewName>("chat");
   const [question, setQuestion] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -327,6 +329,15 @@ export default function App() {
       setShareNotice("Mobile share target prepared.");
     }
     setShareOpen(false);
+  }
+
+  if (showPublicLanding) {
+    return (
+      <LandingPage
+        onStartTrial={() => setShowPublicLanding(false)}
+        onSignIn={() => setShowPublicLanding(false)}
+      />
+    );
   }
 
   return (
