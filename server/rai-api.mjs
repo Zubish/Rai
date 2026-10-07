@@ -1,33 +1,40 @@
 import "./env.mjs";
 import { createOllamaProvider } from "./ollama-provider.mjs";
+import { capabilitiesForQuestion, compactAnalyticsContext, createRxLedgerClient } from "./rxledger-client.mjs";
 
 const MAX_MESSAGE_LENGTH = 4000;
 
-export function createRaiService({ provider = createOllamaProvider(), now = () => new Date() } = {}) {
+export function createRaiService({ provider = createOllamaProvider(), rxLedger = createRxLedgerClient(), now = () => new Date() } = {}) {
   const conversations = new Map();
 
   return {
-    async chat({ message, conversationId, context, dataContext = null }) {
+    async chat({ message, conversationId, context }) {
       validateMessage(message);
       validateContext(context);
       const conversationKey = conversationId || crypto.randomUUID();
-      const existing = conversations.get(conversationKey) || [];
+      if (typeof conversationKey !== "string" || conversationKey.length > 100) throw apiError("validation_error", "Invalid conversation id.", 422);
+      const owner = JSON.stringify([context.tenantId, context.userId, context.branchId, context.role]);
+      const previous = conversations.get(conversationKey);
+      if (previous && previous.owner !== owner) throw apiError("forbidden", "Conversation is unavailable in this scope.", 403);
+      const existing = previous?.messages || [];
       const greeting = isGreeting(message);
+      const verifiedData = greeting || context.mode === "demo" || !rxLedger.isConfigured ? null : await getRxLedgerContext(rxLedger, context, message);
       const result = greeting
         ? { text: "Hello, I'm Rai. I can help you review pharmacy sales, stock, patient demand, reports, and operational priorities. What would you like to look into?", provider: { id: "deterministic", model: null, grounded: true } }
-        : await replyWithProvider({ provider, message, context, history: existing.slice(-8), dataContext });
+        : await replyWithProvider({ provider, message, context, history: existing.slice(-8), dataContext: verifiedData });
 
       const timestamp = now().toISOString();
       const userMessage = { id: crypto.randomUUID(), role: "user", text: message.trim(), createdAt: timestamp };
       const raiMessage = { id: crypto.randomUUID(), role: "rai", text: result.text, createdAt: timestamp };
-      conversations.set(conversationKey, [...existing, userMessage, raiMessage]);
+      if (conversations.size >= 200 && !previous) conversations.delete(conversations.keys().next().value);
+      conversations.set(conversationKey, { owner, messages: [...existing, userMessage, raiMessage].slice(-20) });
 
       return {
         conversationId: conversationKey,
         message: raiMessage,
         provider: result.provider,
-        grounding: { status: dataContext ? "verified_data" : "no_operational_data", sources: dataContext ? ["rxledger"] : [] },
-        warnings: dataContext ? [] : ["No verified RxLedger analytics data was available for this answer."]
+        grounding: { status: verifiedData ? "verified_data" : "no_operational_data", sources: verifiedData ? ["rxledger"] : [] },
+        warnings: greeting ? [] : verifiedData ? verifiedData.warnings || [] : ["No verified RxLedger analytics data was available for this answer."]
       };
     },
     health: async () => {
@@ -35,10 +42,22 @@ export function createRaiService({ provider = createOllamaProvider(), now = () =
       return {
         service: "rai-api",
         provider: { id: provider.id, ...modelHealth },
-        capabilities: { chat: true, conversations: "in_memory_development_only", rxledger: false }
+        capabilities: { chat: true, conversations: "in_memory_development_only", rxledger: rxLedger.isConfigured }
       };
     }
   };
+}
+
+async function getRxLedgerContext(rxLedger, context, message) {
+  const endDate = new Date().toISOString().slice(0, 10);
+  const startDate = new Date(Date.now() - 29 * 86_400_000).toISOString().slice(0, 10);
+  const snapshot = await rxLedger.analyticsSnapshot({
+    context,
+    capabilities: capabilitiesForQuestion(message),
+    startDate,
+    endDate
+  });
+  return compactAnalyticsContext(snapshot);
 }
 
 async function replyWithProvider({ provider, message, context, history, dataContext }) {
@@ -52,7 +71,7 @@ function validateMessage(message) {
 }
 
 function validateContext(context) {
-  if (!context || !context.tenantId || !context.branchId || !context.role) {
+  if (!context || !context.tenantId || !context.branchId || !context.role || !context.userId) {
     throw apiError("unauthorized", "A valid Rai user context is required.", 401);
   }
 }

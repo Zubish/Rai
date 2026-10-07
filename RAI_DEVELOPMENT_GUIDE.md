@@ -74,6 +74,8 @@ Rai may request approved capabilities for medication usage, unique patients, cat
 
 Every request and response must enforce tenant and branch scope. Responses should include source, generation time, date range, filters, and warnings. MVP access is read-only and authenticated server to server.
 
+The executable scope guardrail is documented in `RAI_RXLEDGER_ACCESS_CONTRACT.md`. No change may expand the data contract or role matrix without updating that document and its RxLedger enforcement.
+
 ## Data Integrity Rules
 
 - Deduplicate patients using a stable privacy-safe patient identifier.

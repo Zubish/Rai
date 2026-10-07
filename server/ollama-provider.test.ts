@@ -21,7 +21,7 @@ describe("Ollama provider", () => {
 
     const result = await provider.chat({
       message: "Compare sales",
-      context: { tenantId: "demo", branchId: "lagos", role: "owner" }
+      context: { tenantId: "demo", branchId: "lagos", role: "owner", userId: "user-1" }
     });
 
     expect(result).toEqual({ text: "I need a date range to continue.", model: "llama3.2" });
@@ -34,7 +34,7 @@ describe("Ollama provider", () => {
 
     await expect(provider.chat({
       message: "Show today’s sales",
-      context: { tenantId: "demo", branchId: "lagos", role: "owner" }
+      context: { tenantId: "demo", branchId: "lagos", role: "owner", userId: "user-1" }
     })).rejects.toMatchObject({ code: "model_unavailable", status: 503 });
   });
 });

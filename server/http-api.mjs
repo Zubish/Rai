@@ -1,4 +1,5 @@
 import { createRaiService, apiError } from "./rai-api.mjs";
+import { resolveRequestContext, validateChatBody } from "./request-context.mjs";
 
 const service = createRaiService();
 const RATE_WINDOW_MS = 60_000;
@@ -13,13 +14,12 @@ export async function handleApiRequest(request, response) {
     enforceRateLimit(request);
     if (request.method === "GET" && request.url === "/api/rai/health") return sendJson(response, 200, { data: await service.health() });
     if (request.method === "POST" && request.url === "/api/rai/chat") {
-      const body = await readJson(request);
-      const context = getContext(request);
+      const context = resolveRequestContext(request, { local: true });
+      const body = validateChatBody(await readJson(request));
       const data = await service.chat({
         message: body.message,
         conversationId: body.conversationId,
-        context,
-        dataContext: body.dataContext ?? null
+        context
       });
       return sendJson(response, 200, { data });
     }
@@ -29,16 +29,6 @@ export async function handleApiRequest(request, response) {
     const message = status >= 500 ? "Rai could not complete that request right now." : error.message;
     return sendJson(response, status, { error: { code: error.code || "internal_error", message } });
   }
-}
-
-function getContext(request) {
-  const tenantId = request.headers["x-rai-tenant-id"];
-  const branchId = request.headers["x-rai-branch-id"];
-  const role = request.headers["x-rai-role"];
-  const isLocalDevelopment = process.env.NODE_ENV !== "production" && !process.env.VERCEL;
-  if (isLocalDevelopment) return { tenantId: tenantId || "demo", branchId: branchId || "abuja-sickbay", role: role || "pharmacy_technician" };
-  if (!tenantId || !branchId || !role) throw apiError("unauthorized", "Sign in through RxLedger to use Rai.", 401);
-  return { tenantId, branchId, role };
 }
 
 function enforceRateLimit(request) {
