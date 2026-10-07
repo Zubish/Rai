@@ -45,6 +45,20 @@ The standard request flow is:
 
 The model provider must remain replaceable. Provider-specific logic belongs behind one adapter so Rai can use Gemini, OpenAI, or another approved model without changing product behavior.
 
+## Optional Local AI Connection
+
+Rai may support a private local-model path for development, low-cost evaluation, or deployments that require tighter data control. A local runtime such as Ollama can expose a chat model and an embedding model through separate APIs; `nomic-embed-text` is appropriate for document embeddings, while a lightweight instruction model can support conversational explanation.
+
+This is an implementation option, not a change to Rai's trust model:
+
+- Keep the model behind the same server-side provider adapter used for cloud models.
+- Use embeddings only to retrieve approved documents, policies, and report definitions; retrieved text is context, not a source of operational figures.
+- Never give a local or cloud model direct RxLedger or Neon database credentials.
+- Continue to obtain pharmacy metrics, patient counts, forecasts, and recommendations from approved APIs and deterministic Rai services.
+- Treat local development runtimes as non-production until access control, observability, model evaluation, patching, and infrastructure ownership are defined.
+
+The important architectural decision is that a model is an interchangeable reasoning and explanation layer. Rai's facts, permissions, calculations, and audit trail must remain outside the model.
+
 ## External RxLedger Boundary
 
 Rai may request approved capabilities for medication usage, unique patients, categories, sales and profit, reorder inputs, stockout risk, expiry risk, slow-moving stock, branch discovery, and report metadata.
