@@ -10,7 +10,7 @@ describe("RxLedger Rai client", () => {
   });
   it("rejects a snapshot belonging to another tenant", async () => {
     const client = createRxLedgerClient({ baseUrl: "https://rxledger.example", apiKey: "test", fetchImpl: vi.fn().mockResolvedValue({ ok: true, json: async () => ({ data: {}, meta: { source: "rxledger", tenant_id: "other" } }) }) });
-    await expect(client.analyticsSnapshot({ context: { tenantId: "expected", branchId: "lagos", userId: "user", userSession: "test" }, capabilities: ["inventory_analytics"], startDate: "2026-10-01", endDate: "2026-10-07" })).rejects.toMatchObject({ code: "invalid_snapshot_scope" });
+    await expect(client.analyticsSnapshot({ context: { tenantId: "expected", branchId: "lagos", userId: "user", delegatedToken: "test" }, capabilities: ["inventory_analytics"], startDate: "2026-10-01", endDate: "2026-10-07" })).rejects.toMatchObject({ code: "invalid_snapshot_scope" });
   });
   it("requests a tenant, branch, user and least-privilege capability scope", async () => {
     const fetchImpl = vi.fn().mockResolvedValue({
@@ -21,13 +21,14 @@ describe("RxLedger Rai client", () => {
     const client = createRxLedgerClient({ baseUrl: "https://rxledger.example", apiKey: "test-key", fetchImpl });
 
     await client.analyticsSnapshot({
-      context: { tenantId: "totalenergies", branchId: "lagos", userId: "user-1", userSession: "test-session" },
+      context: { tenantId: "totalenergies", branchId: "lagos", userId: "user-1", delegatedToken: "test-grant" },
       capabilities: ["inventory_analytics"],
       startDate: "2026-09-01",
       endDate: "2026-09-30"
     });
 
-    expect(fetchImpl).toHaveBeenCalledWith("https://rxledger.example/api/rai/analytics-snapshot", expect.objectContaining({ headers: expect.objectContaining({ authorization: "Bearer test-key" }) }));
+    expect(fetchImpl).toHaveBeenCalledWith("https://rxledger.example/api/rai/analytics-snapshot", expect.objectContaining({ headers: expect.objectContaining({ authorization: "Bearer test-key", "x-rai-delegated-token": "test-grant" }) }));
+    expect(fetchImpl.mock.calls[0][1].headers).not.toHaveProperty("x-rai-user-session");
     expect(JSON.parse(fetchImpl.mock.calls[0][1].body)).toMatchObject({ tenant_id: "totalenergies", actor_id: "user-1", branch_ids: ["lagos"], capabilities: ["inventory_analytics"] });
   });
 

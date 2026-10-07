@@ -76,6 +76,8 @@ Every request and response must enforce tenant and branch scope. Responses shoul
 
 The executable scope guardrail is documented in `RAI_RXLEDGER_ACCESS_CONTRACT.md`. No change may expand the data contract or role matrix without updating that document and its RxLedger enforcement.
 
+Delegated-access backend progress and remaining sign-in release gates are tracked in `RAI_CONNECTION_ROLLOUT.md`. The protocol implementation is not yet a user-operable connection; consent UI, callback state validation and Rai browser sessions remain required.
+
 ## Data Integrity Rules
 
 - Deduplicate patients using a stable privacy-safe patient identifier.
@@ -155,3 +157,38 @@ Add tightly governed workflow actions, advanced forecasting services, evidence-g
 ## Non-Negotiable Release Rule
 
 Rai may sound intelligent, but it earns trust through correctness. No release is acceptable if Rai can present invented pharmacy figures, cross tenant or branch boundaries, expose sensitive data, or imply that an uncompleted action was completed.
+
+## Expanded Vision: BI-First, Not BI-Only
+
+The user-provided `RAI_Project_Discussion.txt` extends the long-term vision to an observant pharmacy intelligence and safety layer. Rai should make important details harder to miss without replacing the pharmacist. Future behaviour is observe, analyse and alert, with accountable human decisions.
+
+**Do not restrict Rai by questions. Restrict Rai by capabilities, permissions, evidence and data boundaries.**
+
+Use composable, typed tools rather than one handler per example question. The model proposes a structured analytical plan; application code validates datasets, filters, dates, grouping, metrics and resource limits. RxLedger enforces identity and scope independently of the model and executes controlled read-only operations. No arbitrary model-generated SQL, Python or database credentials are permitted.
+
+For example, unique Lipitor patients across three months with monthly recurrence requires medication resolution, an explicit three-month window, dispensing records and stable internal patient identity. RxLedger should perform deduplication and recurrence analysis internally and return permitted aggregates. Do not export patient-level rows or broaden today's contract to answer this example. Dispense-line counts are not unique-patient counts.
+
+### Separate Responsibilities
+
+- Deterministic analytics and safety services own validated calculations and explicit policy rules.
+- A maintained knowledge service owns licensed, versioned, traceable pharmaceutical evidence. RAG retrieves evidence; it does not guarantee correctness and is unnecessary for querying structured operational metrics.
+- The model interprets requests, selects approved tools, asks clarifying questions and explains evidence. Ollama hosts this replaceable model; Ollama is not Rai itself.
+- RxLedger owns operational enforcement, pharmacist approval, final labels and immutable decision records. A chat response must never be the sole enforcement point for a dispensing block.
+
+Clinical examples in the discussion are design scenarios, not approved clinical rules. Release requires professional validation of medication, formulation, patient context, jurisdiction and institutional policy. Do not encode blanket drug-class instructions or universal override permissions.
+
+### Delivery Order and Exit Gates
+
+1. **Complete the BI connection foundation.** Implement verified sign-in, consent, delegated access and revocation; then Rai-owned conversation persistence. Prove denied roles, expired sessions and cross-tenant/branch requests cannot retrieve data. Current production chat is intentionally blocked pending this handoff.
+2. **Prove the local model path.** Install and verify Ollama, select a model that fits measured hardware, and test chat, structured plans, timeouts and malformed tool calls. Run this alongside the connection work using synthetic data. A Vercel server cannot reach a user's localhost; deployment needs a separately authenticated private inference service or a deliberately local Rai backend. No public unauthenticated Ollama endpoint or silent paid/cloud fallback.
+3. **Deliver flexible, verifiable BI.** Replace keyword-only routing with schema-validated analytical plans and approved general tools. Add authorized branch discovery, date interpretation, follow-up context and deterministic calculations. Start with inventory and dispensing aggregates, then sales/profit when historical transaction data supports them. Every result carries scope, units, definitions, freshness and limitations.
+4. **Gate the beta on evaluation.** Test greetings, ambiguity, recurrence, missing records, access denial, prompt injection and tool failure against known answers. Measure latency and memory on target hardware; reject fabricated metrics or unauthorized results. Add privacy-safe audit events, bounded queries and permission-aware reports before rollout.
+5. **Add deterministic safety as a separate release.** Validate batch/quantity/expiry checks and other approved rules with pharmacy reviewers. Define alert severity, non-overridable versus authorized-review policies and audit records for user, reason, action, timestamp and rule version. Start in shadow mode and evaluate missed events and alert fatigue before workflow enforcement.
+6. **Establish knowledge before smart labels.** Secure permitted, current sources and validated medication-specific rules before patient-specific instruction generation. Require safety checks, provenance and pharmacist accept/edit/remove before RxLedger prints the approved label. The discussion lists labels before the knowledge engine; evidence must precede any knowledge-dependent label feature.
+7. **Expand after validation.** Introduce proactive event-driven review, alert-quality analytics, longitudinal context and additional pharmacy/EMR adapters. Each new patient-data use or write capability needs a separately approved access contract, retention policy and safety evaluation.
+
+### Stack and Scope Decisions
+
+Keep the existing TypeScript application and server-side model adapter. Python/NumPy/pandas may be added behind typed service contracts when validated analytics require them; they are not prerequisites for conversational intelligence and do not automatically improve inference latency. Local models reduce API dependence but still have hardware, maintenance and evaluation costs.
+
+The current access contract remains read-only and excludes patient identifiers. Future clinical context, safety audit summaries and instruction plans are roadmap items, not permissions granted by this vision. Broader data sharing requires explicit authorization and minimisation; never send raw audit logs or clinical records to a model by default.

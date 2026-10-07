@@ -11,12 +11,12 @@ export function createRxLedgerClient({
     isConfigured: Boolean(endpoint && apiKey),
     async analyticsSnapshot({ context, capabilities, startDate, endDate }) {
       if (!endpoint || !apiKey) throw clientError("rxledger_not_configured", "RxLedger connection is not configured.", 503);
-      if (!context.userSession || context.mode === "demo") throw clientError("unauthorized", "A verified RxLedger user session is required.", 401);
+      if (!context.delegatedToken || context.mode === "demo") throw clientError("unauthorized", "A delegated RxLedger grant is required.", 401);
       let response;
       try {
         response = await fetchImpl(endpoint, {
           method: "POST",
-          headers: { "content-type": "application/json", authorization: `Bearer ${apiKey}`, "x-rai-user-session": context.userSession },
+          headers: { "content-type": "application/json", authorization: `Bearer ${apiKey}`, "x-rai-delegated-token": context.delegatedToken },
           redirect: "error",
           signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
           body: JSON.stringify({

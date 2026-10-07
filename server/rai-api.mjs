@@ -61,7 +61,8 @@ async function getRxLedgerContext(rxLedger, context, message) {
 }
 
 async function replyWithProvider({ provider, message, context, history, dataContext }) {
-  const modelResult = await provider.chat({ message: message.trim(), context, history, dataContext });
+  const { tenantId, branchId, role } = context;
+  const modelResult = await provider.chat({ message: message.trim(), context: { tenantId, branchId, role }, history, dataContext });
   return { text: modelResult.text, provider: { id: provider.id || "ollama", model: modelResult.model, grounded: Boolean(dataContext) } };
 }
 

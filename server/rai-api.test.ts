@@ -72,12 +72,13 @@ describe("Rai chat service", () => {
 
     const result = await service.chat({
       message: "Which products will stock out soon?",
-      context: { tenantId: "totalenergies", branchId: "lagos", role: "inventory", userId: "user-1" }
+      context: { tenantId: "totalenergies", branchId: "lagos", role: "inventory", userId: "user-1", delegatedToken: "never-to-provider" }
     });
 
     expect(rxLedger.analyticsSnapshot).toHaveBeenCalled();
     expect(provider.chat.mock.calls[0][0].dataContext).toMatchObject({ source: "rxledger", at_risk_medications: [{ medication_name: "Exforge" }] });
     expect(JSON.stringify(provider.chat.mock.calls[0][0].dataContext)).not.toContain("not-forwarded");
+    expect(JSON.stringify(provider.chat.mock.calls[0][0])).not.toContain("never-to-provider");
     expect(result.grounding.status).toBe("verified_data");
   });
 });

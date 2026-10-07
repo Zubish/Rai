@@ -8,7 +8,9 @@ Every request must carry a server-verified tenant, active RxLedger user, explici
 
 The browser must not create these claims. Production Rai chat is currently fail-closed (401) until the SSO launch handoff is implemented. Local development uses a fixed demo identity that cannot call RxLedger, even when service credentials are present. Caller-supplied dataContext, role, user and tenant headers cannot establish trusted data or identity.
 
-The snapshot endpoint currently requires both the service credential and a valid user session validated against RxLedger's session store, with the actor ID matching the session user. This is a server-to-server scaffold only; do not copy the RxLedger browser session into Rai's browser or expose it to models. Before live rollout, replace this bridge with a dedicated, short-lived delegated session with audience Rai and revocation checks.
+The snapshot endpoint now requires both the service credential and a dedicated delegated Rai grant, with actor, tenant, branches and capabilities matching the approved scope. Raw RxLedger user sessions are no longer accepted by this endpoint. Grants are bound to the parent RxLedger session and expire after 15 minutes; parent logout or idle expiry invalidates them. Current membership, role and branch access are rechecked before data retrieval.
+
+The delegated-access backend is disabled by default pending migration and completion of the browser consent/callback flow. Do not copy an RxLedger browser session into Rai or expose delegated credentials to a model.
 
 ## Approved Capabilities
 
@@ -43,7 +45,7 @@ Rai checks the response tenant, branch, date range, source and capability set ag
 - Current client reduction supports inventory risk only. Sales/profit reports, arbitrary date parsing, branch discovery and export endpoints remain pending. Do not advertise these as completed just because the role matrix reserves their capabilities.
 - Add cursor pagination, bounded response size, privacy-safe audit events and retention policy before production volume. Proposed Rai snapshot-cache lifetime: five minutes; model processing should use aggregates only.
 
-## Sign-in and Connection Flow (Next Implementation)
+## Sign-in and Connection Flow (Partially Implemented)
 
 1. User selects Connect RxLedger in Rai, or opens Rai from their RxLedger workspace.
 2. RxLedger uses its own signed-in session and displays the requested read permissions and branch scope. User passwords never pass through Rai.
@@ -54,6 +56,10 @@ Rai checks the response tenant, branch, date range, source and capability set ag
 ## Verification and Release Status
 
 Local policy and client tests exercise capability and branch restrictions, expired assignments, spoofed headers, injected metric context and conversation isolation. No live connection, SSO deployment, production environment changes or provider data transfer has been performed for this slice.
+
+The backend connection protocol now covers single-use authorization codes, S256 PKCE, fixed HTTPS callback validation, token-hash storage, expiry, explicit revocation and parent-session checks. Rai has tested server-side exchange, inspection and revocation helpers. `createPkce()` produces a verifier and state but does not yet persist or validate a browser login transaction. Production chat remains blocked: these helpers do not constitute a completed sign-in flow.
+
+Remaining gates: reviewed consent screen, state-bound callback, encrypted server-side Rai session storage and Secure/HttpOnly cookies, database integration tests, distributed rate limits, privacy-safe authorization audit events, expired-record cleanup and browser end-to-end tests. The SQL migration has not been applied to a live database. See `RAI_CONNECTION_ROLLOUT.md` for the exact rollout order.
 
 ## Failure Rules
 
