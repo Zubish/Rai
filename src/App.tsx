@@ -23,9 +23,17 @@ import {
   Upload,
   X
 } from "lucide-react";
+import { sendRaiMessage } from "./lib/rai-api";
 
 type Workspace = "ask" | "insights" | "reports" | "alerts" | "library";
-type ChatMessage = { id: string; role: "user" | "rai"; text: string };
+type ChatMessage = {
+  id: string;
+  role: "user" | "rai";
+  text: string;
+  grounding?: "verified_data" | "no_operational_data";
+  warnings?: string[];
+  provider?: string;
+};
 
 const navItems: Array<{ id: Workspace; label: string; icon: typeof Sparkles }> = [
   { id: "ask", label: "Ask Rai", icon: Sparkles },
@@ -56,39 +64,36 @@ function PulseCard() {
     <section className="pulse-card" aria-label="Pharmacy pulse preview">
       <div className="pulse-card__heading">
         <div>
-          <span className="eyebrow">TODAY'S PHARMACY PULSE</span>
-          <h2>Know what needs your attention.</h2>
+          <span className="eyebrow">PHARMACY PULSE</span>
+          <h2>Your connected pharmacy, in one view.</h2>
         </div>
         <div className="pulse-icon"><Lightbulb size={19} /></div>
       </div>
       <div className="pulse-grid">
-        <div><span>Stock risk</span><strong>5 items</strong><small>Need review</small></div>
-        <div><span>Sales today</span><strong>N262.5K</strong><small>Across your branch</small></div>
-        <div><span>Patient demand</span><strong>Steady</strong><small>Continuity is healthy</small></div>
+        <div><span>Inventory</span><strong>Ready</strong><small>Stock signals</small></div>
+        <div><span>Commercial</span><strong>Ready</strong><small>Sales and profit</small></div>
+        <div><span>Continuity</span><strong>Ready</strong><small>Patient demand</small></div>
       </div>
-      <p className="pulse-action"><span>Recommended next step</span> Review low-stock medicines before the next dispensing cycle.</p>
+      <p className="pulse-action"><span>Next step</span> Connect approved RxLedger data to turn this into a live pharmacy pulse.</p>
     </section>
   );
 }
 
-function RaiResponse({ text }: { text: string }) {
+function RaiResponse({ message }: { message: ChatMessage }) {
+  const hasWarning = message.warnings?.length;
   return (
     <article className="message message--rai">
       <RaiMark compact />
       <div className="rai-answer">
-        <p>{text}</p>
-        <div className="answer-card">
+        <p>{message.text}</p>
+        {hasWarning && <div className="answer-card answer-card--warning">
           <div className="answer-card__header">
-            <div><span className="eyebrow">PHARMACY PULSE</span><h3>Today at a glance</h3></div>
-            <span className="status-pill">Ready</span>
+            <div><span className="eyebrow">GROUNDING STATUS</span><h3>Data needed before analysis</h3></div>
+            <span className="status-pill">Not connected</span>
           </div>
-          <div className="answer-metrics">
-            <div><span>Low stock</span><strong>5 items</strong></div>
-            <div><span>Movements</span><strong>0 today</strong></div>
-            <div><span>Priority</span><strong>Reorder review</strong></div>
-          </div>
-          <button className="text-button" type="button">View the underlying report <ChevronRight size={15} /></button>
-        </div>
+          <p>{message.warnings?.[0]}</p>
+        </div>}
+        <span className="message-meta">{message.provider === "deterministic" ? "Rai assistant" : "Rai local intelligence"}</span>
       </div>
     </article>
   );
@@ -111,24 +116,44 @@ export function App() {
   const [darkMode, setDarkMode] = useState(false);
   const [prompt, setPrompt] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [conversationId, setConversationId] = useState<string>();
+  const [isSending, setIsSending] = useState(false);
+  const [chatError, setChatError] = useState<string>();
 
   const startNewChat = () => {
     setMessages([]);
     setPrompt("");
+    setConversationId(undefined);
+    setChatError(undefined);
     setWorkspace("ask");
     setMobileOpen(false);
   };
 
-  const submitPrompt = (event?: FormEvent) => {
+  const submitPrompt = async (event?: FormEvent) => {
     event?.preventDefault();
     const question = prompt.trim();
-    if (!question) return;
-    setMessages(current => [
-      ...current,
-      { id: `${Date.now()}-user`, role: "user", text: question },
-      { id: `${Date.now()}-rai`, role: "rai", text: "Rai is ready to analyse your pharmacy data." }
-    ]);
+    if (!question || isSending) return;
+    const userMessage = { id: `${Date.now()}-user`, role: "user" as const, text: question };
+    setMessages(current => [...current, userMessage]);
     setPrompt("");
+    setChatError(undefined);
+    setIsSending(true);
+    try {
+      const reply = await sendRaiMessage(question, conversationId);
+      setConversationId(reply.conversationId);
+      setMessages(current => [...current, {
+        id: reply.message.id,
+        role: "rai",
+        text: reply.message.text,
+        grounding: reply.grounding.status,
+        warnings: reply.warnings,
+        provider: reply.provider.id
+      }]);
+    } catch (error) {
+      setChatError(error instanceof Error ? error.message : "Rai could not complete that request right now.");
+    } finally {
+      setIsSending(false);
+    }
   };
 
   return (
@@ -198,7 +223,9 @@ export function App() {
                 </div>
               ) : (
                 <div className="message-list" aria-live="polite">
-                  {messages.map(message => message.role === "user" ? <article className="message message--user" key={message.id}><p>{message.text}</p></article> : <RaiResponse key={message.id} text={message.text} />)}
+                  {messages.map(message => message.role === "user" ? <article className="message message--user" key={message.id}><p>{message.text}</p></article> : <RaiResponse key={message.id} message={message} />)}
+                  {isSending && <div className="thinking" role="status">Rai is reviewing your question...</div>}
+                  {chatError && <div className="chat-error" role="alert">{chatError}</div>}
                 </div>
               )}
             </div>
@@ -206,8 +233,8 @@ export function App() {
               <div className="composer">
                 <button className="composer-icon" type="button" aria-label="Add files"><Upload size={19} /></button>
                 <label className="sr-only" htmlFor="rai-prompt">Ask Rai</label>
-                <textarea id="rai-prompt" aria-label="Ask Rai" placeholder="Ask Rai about pharmacy operations..." rows={1} value={prompt} onChange={event => setPrompt(event.target.value)} onKeyDown={event => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); submitPrompt(); } }} />
-                <button className="send-button" type="submit" aria-label="Send message" disabled={!prompt.trim()}><Send size={18} /></button>
+                <textarea id="rai-prompt" aria-label="Ask Rai" placeholder="Ask Rai about pharmacy operations..." rows={1} value={prompt} disabled={isSending} onChange={event => setPrompt(event.target.value)} onKeyDown={event => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void submitPrompt(); } }} />
+                <button className="send-button" type="submit" aria-label="Send message" disabled={!prompt.trim() || isSending}><Send size={18} /></button>
               </div>
               <p>Rai can make mistakes. Check important pharmacy decisions.</p>
             </form>

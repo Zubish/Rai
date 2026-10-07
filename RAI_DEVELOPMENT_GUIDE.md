@@ -59,6 +59,15 @@ This is an implementation option, not a change to Rai's trust model:
 
 The important architectural decision is that a model is an interchangeable reasoning and explanation layer. Rai's facts, permissions, calculations, and audit trail must remain outside the model.
 
+### Local API Contract
+
+The development stack exposes the following internal Rai endpoints:
+
+- `GET /api/rai/health`: reports model-provider reachability and configured-model availability without exposing credentials.
+- `POST /api/rai/chat`: accepts a validated message and conversation id, resolves authorised context, calls the provider only when needed, and returns an auditable reply envelope.
+
+In local development, the API provides an isolated demo context. Production requests must carry tenant, branch, and role from the RxLedger-authenticated server session; the browser must never manufacture these headers or contact a model provider directly.
+
 ## External RxLedger Boundary
 
 Rai may request approved capabilities for medication usage, unique patients, categories, sales and profit, reorder inputs, stockout risk, expiry risk, slow-moving stock, branch discovery, and report metadata.
