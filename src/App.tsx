@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { sendRaiMessage } from "./lib/rai-api";
 import { deleteFile, downloadFile, LibraryFile, listFiles, saveFile } from "./lib/local-files";
+import { RxLedgerConnection, ConnectionStatus } from './components/RxLedgerConnection';
 
 type Workspace = "ask" | "insights" | "reports" | "alerts" | "library";
 type ChatMessage = {
@@ -105,6 +106,7 @@ export function App() {
   const [files, setFiles] = useState<LibraryFile[]>([]);
   const [fileError, setFileError] = useState<string>();
   const [shareStatus, setShareStatus] = useState("");
+  const [connection, setConnection] = useState<ConnectionStatus>({ connected: false });
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -113,6 +115,12 @@ export function App() {
   const following = useRef(true);
   const unread = notices.filter(item => !item.read).length;
   const compact = sidebarCollapsed && !isMobile;
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).has('connection')) {
+      setPanel('connection');
+      window.history.replaceState(null, '', window.location.pathname);
+    }
+  }, []);
 
   useEffect(() => {
     const media = window.matchMedia?.("(max-width: 860px)");
@@ -270,7 +278,7 @@ export function App() {
           <button className="icon-button mobile-menu" type="button" aria-label="Open navigation" onClick={() => setMobileOpen(true)}><Menu size={20} /></button>
           <div className="crumb"><span>RxLedger</span><ChevronRight size={14} /><strong>{workspace === "ask" ? "Ask Rai" : workspace[0].toUpperCase() + workspace.slice(1)}</strong></div>
           <div className="topbar__right">
-            <button className="branch-switcher" type="button" onClick={() => setPanel("connection")}><span className="branch-switcher__icon"><Bot size={15} /></span><span><strong>Local workspace</strong><small>RxLedger not connected</small></span><ChevronDown size={15} /></button>
+            <button className="branch-switcher" type="button" aria-label="RxLedger workspace connection" onClick={() => setPanel("connection")}><span className="branch-switcher__icon"><Bot size={15} /></span><span><strong>{connection.connected ? connection.tenantId : 'Local workspace'}</strong><small>{connection.connected ? `Branch: ${connection.branchId}` : 'RxLedger not connected'}</small></span><ChevronDown size={15} /></button>
             <button className="icon-button" type="button" aria-label="Share conversation" title="Share conversation" disabled={!messages.length || isSending} onClick={() => { setShareStatus(""); setPanel("share"); }}><Share2 size={18} /></button>
             <button className="icon-button notification" type="button" aria-label="Notifications" title="Notifications" onClick={() => { setPanel("notifications"); setNotices(current => current.map(item => ({ ...item, read: true }))); }}><Bell size={18} />{unread > 0 && <i>{unread}</i>}</button>
             <button className="avatar avatar--top" type="button" aria-label="Open user profile" onClick={() => setPanel("profile")}>AS</button>
@@ -323,7 +331,10 @@ export function App() {
         {panel === "notifications" && (notices.length ? <>{notices.map(item => <p className="notice-row" key={item.id}>{item.text}</p>)}<button className="text-button" onClick={() => setNotices([])}>Clear notifications</button></> : <p>No task notifications yet.</p>)}
         {panel === "share" && <><p>Sharing includes the full conversation. Review it for private pharmacy information first.</p><div className="share-actions"><button onClick={() => { void navigator.clipboard.writeText(transcript()).then(() => setShareStatus("Conversation copied.")).catch(() => setShareStatus("Clipboard unavailable. Download instead.")); }}>Copy conversation</button><button onClick={() => downloadFile(new Blob([transcript()], { type: "text/plain" }), "rai-conversation.txt")}><Download size={16} />Download</button><button onClick={() => { void shareConversation(); }}><Share2 size={16} />Share file</button></div><p role="status">{shareStatus}</p><p>Public links are unavailable until authenticated conversation storage is connected.</p></>}
         {panel === "settings" && <><label><input type="checkbox" role="switch" checked={darkMode} onChange={event => setDarkMode(event.target.checked)} /> Dark mode</label><p>Files are stored on this browser/device. Chat history currently lasts for this session.</p></>}
-        {panel === "connection" && <><p>RxLedger is not connected in this local development session.</p><p>Secure sign-in and consent are required before branch data can be accessed. No branch switching is available yet.</p></>}
+        {panel === "connection" && <RxLedgerConnection disabled={isSending} onChange={status => {
+          if (connection.connected !== status.connected || connection.tenantId !== status.tenantId || connection.branchId !== status.branchId) startNewChat();
+          setConnection(status);
+        }} />}
         {panel === "profile" && <><p>Local development session</p><p>No authenticated pharmacy account is connected.</p><button className="text-button" onClick={() => setPanel("settings")}>Open settings</button></>}
       </div></div></div>}
     </div>

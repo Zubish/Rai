@@ -49,11 +49,13 @@ export function createRaiService({ provider = createOllamaProvider(), rxLedger =
 }
 
 async function getRxLedgerContext(rxLedger, context, message) {
+  const capabilities = capabilitiesForQuestion(message);
+  if (context.capabilities && capabilities.some(item => !context.capabilities.includes(item))) throw apiError('forbidden', 'Your approved RxLedger access does not cover this analysis. Reconnect with the required permission.', 403);
   const endDate = new Date().toISOString().slice(0, 10);
   const startDate = new Date(Date.now() - 29 * 86_400_000).toISOString().slice(0, 10);
   const snapshot = await rxLedger.analyticsSnapshot({
     context,
-    capabilities: capabilitiesForQuestion(message),
+    capabilities,
     startDate,
     endDate
   });

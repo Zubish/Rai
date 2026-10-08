@@ -1,5 +1,6 @@
 import { createRaiService, apiError } from "./rai-api.mjs";
 import { resolveRequestContext, validateChatBody } from "./request-context.mjs";
+import { handleConnection, resolveConnectedContext, sessionCookie } from './connection-http.mjs';
 
 const service = createRaiService();
 const RATE_WINDOW_MS = 60_000;
@@ -13,8 +14,19 @@ export async function handleApiRequest(request, response) {
   try {
     enforceRateLimit(request);
     if (request.method === "GET" && request.url === "/api/rai/health") return sendJson(response, 200, { data: await service.health() });
+    if (request.url.split('?')[0] === '/api/rai/connection' || request.url.split('?')[0] === '/api/rai/callback') {
+      if (request.method === 'POST') request.body = await readJson(request);
+      const adapter = {
+        code: 200,
+        setHeader: response.setHeader.bind(response),
+        status(code) { this.code = code; return this; },
+        json(payload) { return sendJson(response, this.code, payload); },
+        end() { response.writeHead(this.code); response.end(); }
+      };
+      return handleConnection(request, adapter, request.url.split('?')[0] === '/api/rai/callback');
+    }
     if (request.method === "POST" && request.url === "/api/rai/chat") {
-      const context = resolveRequestContext(request, { local: true });
+      const context = sessionCookie(request) ? await resolveConnectedContext(request) : resolveRequestContext(request, { local: true });
       const body = validateChatBody(await readJson(request));
       const data = await service.chat({
         message: body.message,

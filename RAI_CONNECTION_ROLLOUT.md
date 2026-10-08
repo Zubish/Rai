@@ -15,11 +15,17 @@ The authorization handler derives user identity from the cookie, not a caller-su
 
 Snapshot requests use the existing service bearer credential plus `x-rai-delegated-token`. Consent scope and current RxLedger policy both apply. Parent logout, deletion or 30-minute idle expiry invalidates the grant; Rai analysis does not extend the parent session. Rai keeps delegated credentials outside its model adapter.
 
-## Not Yet Available to Users
+## Implemented, Not Activated
 
-The Connect button, consent page, callback/state validation and Rai browser session are not wired. Production `/api/rai/chat` continues to reject requests until that work is complete. Local demo mode continues to exclude live RxLedger data. A successful configuration check is not proof of a live connection.
+Connect/Disconnect, signed-in RxLedger consent, callback/state validation, encrypted database-backed Rai sessions and scoped branch selection are implemented. Production remains disabled pending real database and browser verification. Local demo mode excludes live RxLedger data. A successful configuration check is not proof of a live connection.
 
-## Next Implementation
+Rai requires its own `DATABASE_URL` or `POSTGRES_URL`, `RAI_APP_ORIGIN=https://rai-mu.vercel.app`, a server-only base64 32-byte `RAI_SESSION_ENCRYPTION_KEY`, `RXLEDGER_BASE_URL=https://rxledger.vercel.app`, and the matching server-to-server credential. Apply `migrations/rai-connection-sessions.sql` to Rai's database only after isolated testing. Set `RAI_CONNECTION_ENABLED=true` only after verification.
+
+The implemented callback is `https://rai-mu.vercel.app/api/rai/callback`. Configure RxLedger's `RAI_REDIRECT_URI` to this exact address. No refresh tokens are issued; reconnect after the 15-minute access expires.
+
+## Rollout Gates
+
+Steps 1-4 below are implemented in source. Complete signed-in browser verification, audit-event coverage and production activation remain outstanding. Rai session tests cover encrypted storage, state/browser binding, replay, denial, expiry, branch restrictions, live permission changes, tenant mismatch, revocation and upstream failure. PostgreSQL testing on an isolated branch verifies persistence, concurrent single-use consumption and distributed rate limiting. These tests do not replace signed-in browser testing.
 
 1. Build Connect/Disconnect in Rai and a consent page within signed-in RxLedger. Show the exact workspace, branches and read-only capabilities; support denial without issuing a code. Never auto-approve from URL parameters.
 2. Store the random state and PKCE verifier in a short-lived, single-use server-side Rai login transaction bound to the initiating browser. Use an allowlisted callback. Compare state before exchange and prevent callback replay/login CSRF.
@@ -32,11 +38,18 @@ The Connect button, consent page, callback/state validation and Rai browser sess
 ## RxLedger Configuration
 
 - `RAI_DELEGATION_ENABLED=false` by default. Do not turn on yet.
-- `RAI_REDIRECT_URI`: one exact HTTPS Rai callback URL, without query or fragment. This route still needs implementation; do not configure a guessed URL as a working connection.
+- `RAI_REDIRECT_URI`: `https://rai-mu.vercel.app/api/rai/callback`, without query or fragment.
 - `RXLEDGER_APP_ORIGIN`: exact HTTPS origin serving RxLedger's consent page.
 - `RXLEDGER_RAI_API_KEY`: existing private server-to-server credential, kept only on servers.
 
-No production secrets, flags or database schema were changed during this implementation. Publishing source is not enabling the integration. Unit tests use an in-memory test store; real PostgreSQL migration/integration testing is still required.
+On 2026-10-08, both additive migrations passed on isolated Neon branches and were applied to the user-designated production branches. Production database URLs, a coordinated private service key and Rai's session encryption key were configured in Vercel. Origin and callback configuration is also present. Neither enable flag has been turned on. Publishing source is not enabling the integration.
+
+| App | Neon project | Production branch | Isolated verification branch |
+| --- | --- | --- | --- |
+| Rai | wandering-frost-68820655 | br-withered-field-a6jic5oj | br-curly-king-a6tnh3y6 |
+| RxLedger | crimson-hill-05547844 | br-summer-rice-appce56c | br-mute-lake-api6re1x |
+
+Verification branches contain synthetic test records and remain separate from production. Secret files are ignored by Git. No pharmacy operational records were modified.
 
 ## Ollama Track
 

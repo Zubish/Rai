@@ -76,6 +76,9 @@ button { cursor: pointer; }
 .library-view { padding: 32px; }
 .message p { white-space: pre-wrap; overflow-wrap: anywhere; }
 .utility-body input[type="checkbox"] { width: auto; accent-color: var(--wine); }
+.utility-body form, .utility-body label { display: grid; gap: 8px; }
+.utility-body select { width: 100%; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--ink); padding: 10px; font: inherit; }
+.utility-body button:not(.icon-button):not(.text-button) { border: 1px solid var(--line); border-radius: 6px; background: var(--wine); color: var(--surface); padding: 10px 14px; }
 .nav-item svg { pointer-events: none; }
 .rai-app[data-theme="dark"] { --wine: #de8b9f; --wine-dark: #c56e84; }
 .rai-app[data-theme="dark"] .send-button, .rai-app[data-theme="dark"] .share-actions button { color: #241017; }
