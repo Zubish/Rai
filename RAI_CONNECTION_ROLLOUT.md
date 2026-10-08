@@ -40,4 +40,8 @@ No production secrets, flags or database schema were changed during this impleme
 
 ## Ollama Track
 
-Ollama installation remains incomplete. The last machine check found approximately 3.8 GB RAM, no Ollama executable and no response on port 11434. Install from the official distribution, then benchmark a hardware-appropriate model on synthetic questions before allowing operational data. No automatic cloud-model fallback. A Vercel function cannot use this desktop's localhost as its inference server.
+Ollama 0.40.1 is installed on this desktop as a standalone CPU runtime at `%LOCALAPPDATA%\Programs\OllamaCPU`. Files came from the official Windows archive; ZIP integrity checks passed and the CLI's Authenticode signature was valid for Ollama Inc. The service has been verified on `127.0.0.1:11434` with cloud features disabled.
+
+This desktop has approximately 3.8 GB RAM. Local Rai configuration selects `qwen2.5:0.5b`; download digest verification and non-greeting API/browser inference succeeded. The model failed a basic synthetic stock-duration calculation and is not approved for production analytics. `npm run dev` includes automatic local Windows runtime startup, but its cold-start path remains unverified. Development runs one model/request at a time and releases model memory after each response. See `OLLAMA_LOCAL_SETUP.md` for configuration and verification status.
+
+Benchmark using synthetic questions before allowing operational data. No automatic cloud-model fallback. A Vercel function cannot use this desktop's localhost as its inference server.
