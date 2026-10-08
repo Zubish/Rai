@@ -50,6 +50,9 @@ export function createRxLedgerClient({
 
 export function compactAnalyticsContext(snapshot) {
   const medications = Array.isArray(snapshot.data?.medications) ? snapshot.data.medications : [];
+  const permitted = ['medication_id', 'medication_name', 'strength', 'category', 'unit', 'current_stock', 'average_monthly_usage', 'pending_owed_quantity', 'days_until_stockout', 'days_since_last_sale', 'expiry_risk_quantity', 'cost_per_unit', 'selling_price_per_unit', 'stock_value'];
+  const reduced = medications.slice(0, 100).map(item => Object.fromEntries(permitted.filter(key => item[key] !== undefined).map(key => [key, item[key]])));
+  const count = (field, predicate) => medications.every(item => Number.isFinite(item[field])) ? medications.filter(item => predicate(item[field])).length : null;
   const atRisk = medications
     .filter((item) => item.days_until_stockout <= 14 || item.expiry_risk_quantity > 0)
     .sort((left, right) => left.days_until_stockout - right.days_until_stockout)
@@ -63,6 +66,13 @@ export function compactAnalyticsContext(snapshot) {
     date_range: snapshot.meta.date_range,
     capabilities: snapshot.meta.filters?.capabilities || [],
     medication_count: medications.length,
+    medications: reduced,
+    omitted_medication_count: Math.max(0, medications.length - reduced.length),
+    inventory_summary: {
+      stocked_record_count: count('current_stock', value => value > 0),
+      stockout_risk_record_count: count('days_until_stockout', value => value <= 14),
+      expiry_risk_record_count: count('expiry_risk_quantity', value => value > 0)
+    },
     continuity_record_count: Number.isSafeInteger(snapshot.data?.continuity_summary?.dispense_line_count) ? snapshot.data.continuity_summary.dispense_line_count : null,
     at_risk_medications: atRisk,
     warnings: snapshot.meta.warnings || []
@@ -76,7 +86,7 @@ export function capabilitiesForQuestion(message) {
   if (/sales|sold|revenue|transaction|perform|top.?selling/.test(question)) capabilities.add("sales_analytics");
   if (/profit|margin|cost|budget|financial/.test(question)) capabilities.add("financial_analytics");
   if (/patient|refill|continuity|follow.?up|demand/.test(question)) capabilities.add("continuity_analytics");
-  return capabilities.size ? [...capabilities] : ["inventory_analytics"];
+  return [...capabilities];
 }
 
 function clientError(code, message, status) {

@@ -76,7 +76,7 @@ Every request and response must enforce tenant and branch scope. Responses shoul
 
 The executable scope guardrail is documented in `RAI_RXLEDGER_ACCESS_CONTRACT.md`. No change may expand the data contract or role matrix without updating that document and its RxLedger enforcement.
 
-Delegated-access backend progress and remaining sign-in release gates are tracked in `RAI_CONNECTION_ROLLOUT.md`. The protocol implementation is not yet a user-operable connection; consent UI, callback state validation and Rai browser sessions remain required.
+Delegated-access backend progress and remaining sign-in release gates are tracked in `RAI_CONNECTION_ROLLOUT.md`. Consent UI, callback validation, encrypted browser sessions and database migrations are implemented. Live access remains disabled pending complete signed-in verification and an approved inference deployment.
 
 ## Data Integrity Rules
 
@@ -191,4 +191,31 @@ Clinical examples in the discussion are design scenarios, not approved clinical 
 
 Keep the existing TypeScript application and server-side model adapter. Python/NumPy/pandas may be added behind typed service contracts when validated analytics require them; they are not prerequisites for conversational intelligence and do not automatically improve inference latency. Local models reduce API dependence but still have hardware, maintenance and evaluation costs.
 
+### Current Conversational Slice
+
+Connection, sign-in and current-branch questions are answered from verified
+server context without invoking the model or requesting analytics. Demo IDs are
+internal isolation keys, not live identity. They are excluded from model scope
+and public branch metadata. A configured server key is not a signed-in session.
+
+Conversation, clarification, analytics and unsupported clinical requests are separated
+before data retrieval. Date-only follow-ups reuse the previous analytical topic
+within the same scoped in-memory conversation. Today, yesterday, this month, last
+month, bounded day windows and explicit ISO ranges use Africa/Lagos calendar dates.
+Unresolved branch names and ambiguous periods require clarification, not guessed
+scope. This router is a conservative deterministic fallback, not the completed
+model-generated general analytical planner described in the roadmap.
+
+Reduced model context preserves up to 100 permitted medication rows, full-snapshot
+inventory record counts, risk rows and explicit truncation information; patient
+identifiers remain excluded. Current stock is never historical stock, average
+monthly usage is never exact units sold, and dispense lines are never unique
+patients. Unsupported transaction metrics must not be inferred from snapshot
+prices. Analytical replies expose requested scope and limitations in the chat.
+Conversation persistence across server restarts and full live-data verification
+remain outstanding. See `OLLAMA_PRODUCTION_SETUP.md` for hosted-model requirements.
+
 The current access contract remains read-only and excludes patient identifiers. Future clinical context, safety audit summaries and instruction plans are roadmap items, not permissions granted by this vision. Broader data sharing requires explicit authorization and minimisation; never send raw audit logs or clinical records to a model by default.
+# Action Feedback
+
+Failed or blocked actions must explain the safe, known reason and a practical next step. Never claim completion after failure, reveal private service errors, or guess an unconfirmed root cause. Preserve the requested period across clarification replies. Analytics without verified operational data must explain the missing connection or data rather than ask the model to invent results.

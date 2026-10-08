@@ -1,6 +1,7 @@
 import { createRaiService, apiError } from "./rai-api.mjs";
 import { resolveRequestContext, validateChatBody } from "./request-context.mjs";
 import { handleConnection, resolveConnectedContext, sessionCookie } from './connection-http.mjs';
+import { publicFailure } from './public-failure.mjs';
 
 const service = createRaiService();
 const RATE_WINDOW_MS = 60_000;
@@ -37,9 +38,8 @@ export async function handleApiRequest(request, response) {
     }
     return sendJson(response, 404, { error: { code: "not_found", message: "Rai endpoint not found." } });
   } catch (error) {
-    const status = Number.isInteger(error.status) ? error.status : 500;
-    const message = status >= 500 ? "Rai could not complete that request right now." : error.message;
-    return sendJson(response, status, { error: { code: error.code || "internal_error", message } });
+    const failure = publicFailure(error);
+    return sendJson(response, failure.status, { error: failure.error });
   }
 }
 

@@ -59,6 +59,21 @@ describe("Rai frontend", () => {
     expect(screen.getByLabelText("Rai application")).toHaveAttribute("data-sidebar", "expanded");
   });
 
+  it("explains a blocked request and tells the user what to do next", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      error: { message: "Rai could not complete this request.",
+        reason: "The model service did not return a usable response.",
+        nextStep: "Check that Ollama is running, then try again." }
+    }), { status: 503, headers: { "content-type": "application/json" } })));
+    render(<App />);
+    fireEvent.change(screen.getByRole("textbox", { name: "Ask Rai" }), { target: { value: "Help me plan" } });
+    fireEvent.click(screen.getByRole("button", { name: "Send message" }));
+    const feedback = await screen.findByRole("alert");
+    expect(feedback).toHaveTextContent("Reason: The model service did not return a usable response.");
+    expect(feedback).toHaveTextContent("Next: Check that Ollama is running, then try again.");
+    expect(screen.queryByText("Rai finished responding to your question.")).not.toBeInTheDocument();
+  });
+
   it("shows honest empty notifications and working settings", () => {
     render(<App />);
     fireEvent.click(screen.getByRole("button", { name: "Notifications" }));

@@ -9,7 +9,7 @@ export function resolveRequestContext(request, { local = false } = {}) {
       (origin && ![`http://${host}`, `https://${host}`].includes(origin))) {
     throw Object.assign(new Error("Local Rai requests must be same-origin."), { code: "forbidden", status: 403 });
   }
-  return { tenantId: "demo", branchId: "abuja-sickbay", role: "viewer", userId: "demo-user", mode: "demo" };
+  return { tenantId: "demo", branchId: "local-demo", role: "viewer", userId: "demo-user", mode: "demo" };
 }
 
 export function validateChatBody(body) {

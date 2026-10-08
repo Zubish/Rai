@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { handleConnection, requireOrigin, sessionCookie } from './connection-http.mjs';
 
-afterEach(() => vi.unstubAllEnvs());
+afterEach(() => { vi.unstubAllEnvs(); vi.restoreAllMocks(); });
 
 describe('connection HTTP boundary', () => {
   it('requires the configured origin for browser mutations', () => {
@@ -17,12 +17,14 @@ describe('connection HTTP boundary', () => {
     expect(sessionCookie({ headers: {} })).toBe('');
   });
   it('fails closed when disabled and never caches the response', async () => {
+    const log = vi.spyOn(console, 'info').mockImplementation(() => {});
     vi.stubEnv('RAI_CONNECTION_ENABLED', 'false');
     const response = { setHeader: vi.fn(), status: vi.fn(), json: vi.fn() };
     response.status.mockReturnValue(response);
     await handleConnection({ method: 'GET', headers: {} }, response);
     expect(response.status).toHaveBeenCalledWith(503);
     expect(response.setHeader).toHaveBeenCalledWith('Cache-Control', 'no-store');
-    expect(response.json).toHaveBeenCalledWith({ error: { code: 'connection_failed', message: expect.not.stringContaining('postgres') } });
+    expect(response.json).toHaveBeenCalledWith({ error: expect.objectContaining({ code: 'connection_not_enabled', reason: 'Live access has not been enabled for this instance.', nextStep: expect.any(String) }) });
+    expect(log).toHaveBeenCalledWith(JSON.stringify({ event: 'rai_connection', action: 'request_failed', status: 503 }));
   });
 });

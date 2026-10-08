@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
+import { formatRaiFailure } from '../lib/rai-api';
 
 export type ConnectionStatus = { connected: boolean; tenantId?: string; branchId?: string; branchIds?: string[]; role?: string; capabilities?: string[] };
 async function request(body?: Record<string, unknown>): Promise<ConnectionStatus & { url?: string }> {
   const response = await fetch('/api/rai/connection', { method: body ? 'POST' : 'GET', credentials: 'same-origin', headers: body ? { 'Content-Type': 'application/json' } : {}, ...(body ? { body: JSON.stringify(body) } : {}) });
   const result = await response.json();
-  if (!response.ok) throw new Error(result.error?.message || 'Connection unavailable.');
+  if (!response.ok) throw new Error(formatRaiFailure(result.error));
   return result.data;
 }
 export function RxLedgerConnection({ onChange, disabled = false }: { onChange: (status: ConnectionStatus) => void; disabled?: boolean }) {

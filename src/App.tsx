@@ -22,7 +22,7 @@ import {
   Sun,
   X
 } from "lucide-react";
-import { sendRaiMessage } from "./lib/rai-api";
+import { sendRaiMessage, RaiChatReply } from "./lib/rai-api";
 import { deleteFile, downloadFile, LibraryFile, listFiles, saveFile } from "./lib/local-files";
 import { RxLedgerConnection, ConnectionStatus } from './components/RxLedgerConnection';
 
@@ -34,6 +34,7 @@ type ChatMessage = {
   grounding?: "verified_data" | "no_operational_data";
   warnings?: string[];
   provider?: string;
+  audit?: RaiChatReply['audit'];
 };
 
 const navItems: Array<{ id: Workspace; label: string; icon: typeof Sparkles }> = [
@@ -69,12 +70,13 @@ function RaiResponse({ message }: { message: ChatMessage }) {
         <p>{message.text}</p>
         {hasWarning && <div className="answer-card answer-card--warning">
           <div className="answer-card__header">
-            <div><span className="eyebrow">GROUNDING STATUS</span><h3>Data needed before analysis</h3></div>
-            <span className="status-pill">Not connected</span>
+            <div><span className="eyebrow">GROUNDING STATUS</span><h3>{message.grounding === 'verified_data' ? 'Scope and limitations' : 'Data needed before analysis'}</h3></div>
+            <span className="status-pill">{message.grounding === 'verified_data' ? 'RxLedger source' : 'No verified data'}</span>
           </div>
-          <p>{message.warnings?.[0]}</p>
+          {message.warnings?.map((warning, index) => <p key={index}>{warning}</p>)}
         </div>}
-        <span className="message-meta">{message.provider === "deterministic" ? "Rai assistant" : "Rai local intelligence"}</span>
+        {message.grounding === 'verified_data' && message.audit?.dateRange && <p className="message-meta">RxLedger · {message.audit.branchId} · {message.audit.dateRange.startDate} to {message.audit.dateRange.endDate} · {message.audit.dateRange.timezone}</p>}
+        <span className="message-meta">{message.provider === "deterministic" ? "Rai assistant" : "Rai intelligence"}</span>
       </div>
     </article>
   );
@@ -210,7 +212,8 @@ export function App() {
         text: reply.message.text,
         grounding: reply.grounding.status,
         warnings: reply.warnings,
-        provider: reply.provider.id
+        provider: reply.provider.id,
+        audit: reply.audit
       }]);
       notify("Rai finished responding to your question.");
     } catch (error) {

@@ -2,6 +2,16 @@ import { describe, expect, it, vi } from "vitest";
 import { capabilitiesForQuestion, compactAnalyticsContext, createRxLedgerClient } from "./rxledger-client.mjs";
 
 describe("RxLedger Rai client", () => {
+  it('does not turn ordinary conversation into an inventory query', () => {
+    expect(capabilitiesForQuestion('How are you?')).toEqual([]);
+  });
+  it('preserves healthy-stock and permitted financial inputs, not just risk rows', () => {
+    const context = compactAnalyticsContext({ data: { medications: [{ medication_id: 'healthy', medication_name: 'Aprovel', current_stock: 120, days_until_stockout: 60, expiry_risk_quantity: 0, cost_per_unit: 20, patient_id: 'private' }] }, meta: { source: 'rxledger', filters: { capabilities: ['inventory_analytics', 'financial_analytics'] } } });
+    expect(context.medications).toMatchObject([{ medication_name: 'Aprovel', current_stock: 120, cost_per_unit: 20 }]);
+    expect(context.at_risk_medications).toHaveLength(0);
+    expect(JSON.stringify(context)).not.toContain('private');
+    expect(context.inventory_summary).toMatchObject({ stocked_record_count: 1, stockout_risk_record_count: 0 });
+  });
   it("refuses a service-key-only request before making a network call", async () => {
     const fetchImpl = vi.fn();
     const client = createRxLedgerClient({ baseUrl: "https://rxledger.example", apiKey: "test", fetchImpl });

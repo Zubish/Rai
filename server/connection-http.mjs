@@ -2,6 +2,7 @@ import './env.mjs';
 import { createRxLedgerConnection } from './rxledger-connection.mjs';
 import { createConnectionStore } from './connection-store.mjs';
 import { createConnectionSessions } from './connection-session.mjs';
+import { publicFailure } from './public-failure.mjs';
 
 let sessions;
 export function sessionCookie(request, name = '__Host-rai-session') {
@@ -10,7 +11,7 @@ export function sessionCookie(request, name = '__Host-rai-session') {
   return cookies.split(';').map(item => item.trim()).find(item => item.startsWith(`${name}=`))?.slice(name.length + 1) || '';
 }
 export async function connectionSessions() {
-  if (process.env.RAI_CONNECTION_ENABLED !== 'true') throw Object.assign(new Error('Secure RxLedger connection is not enabled.'), { status: 503 });
+  if (process.env.RAI_CONNECTION_ENABLED !== 'true') throw Object.assign(new Error('Secure RxLedger connection is not enabled.'), { status: 503, code: 'connection_not_enabled' });
   if (!sessions) sessions = createConnectionStore().then(store => createConnectionSessions({ store, upstream: createRxLedgerConnection(), origin: process.env.RAI_APP_ORIGIN, rxOrigin: process.env.RXLEDGER_BASE_URL, encryptionKey: process.env.RAI_SESSION_ENCRYPTION_KEY })).catch(error => { sessions = undefined; throw error; });
   return sessions;
 }
@@ -24,6 +25,7 @@ export async function resolveConnectedContext(request) {
   return api.context(sessionCookie(request));
 }
 const cookie = (name, token, age) => `${name}=${token}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=${age}`;
+const audit = (action, status) => console.info(JSON.stringify({ event: 'rai_connection', action, status }));
 export async function handleConnection(request, response, callback = false) {
   response.setHeader('Cache-Control', 'no-store');
   response.setHeader('Referrer-Policy', 'no-referrer');
@@ -38,6 +40,7 @@ export async function handleConnection(request, response, callback = false) {
       const result = await api.callback({ browserToken: sessionCookie(request, '__Host-rai-login'), state: params.get('state'), code: params.get('code'), denied: params.get('error') === 'access_denied' });
       response.setHeader('Set-Cookie', [cookie('__Host-rai-login', '', 0), ...(result.sessionToken ? [cookie('__Host-rai-session', result.sessionToken, result.expiresIn)] : [])]);
       response.setHeader('Location', `${api.origin}/?connection=${result.denied ? 'denied' : 'connected'}`);
+      audit(result.denied ? 'denied' : 'connected', 303);
       return response.status(303).end();
     }
     if (request.method === 'GET') {
@@ -52,21 +55,25 @@ export async function handleConnection(request, response, callback = false) {
     if (body.action === 'start') {
       const result = await api.start(body.tenant);
       response.setHeader('Set-Cookie', cookie('__Host-rai-login', result.browserToken, 300));
+      audit('started', 200);
       return response.status(200).json({ data: { url: result.url } });
     }
     if (body.action === 'disconnect') {
       response.setHeader('Set-Cookie', cookie('__Host-rai-session', '', 0));
       await api.disconnect(sessionCookie(request));
+      audit('disconnected', 200);
       return response.status(200).json({ data: { connected: false } });
     }
     if (body.action === 'select_branch') {
       await api.selectBranch(sessionCookie(request), body.branchId);
+      audit('branch_selected', 200);
       return response.status(200).json({ data: { selected: true } });
     }
     throw Object.assign(new Error('Unknown connection action.'), { status: 422 });
   } catch (error) {
-    const status = Number.isInteger(error.status) ? error.status : 500;
+    const { status, error: feedback } = publicFailure(error);
+    audit(callback ? 'callback_failed' : 'request_failed', status);
     if (callback) response.setHeader('Set-Cookie', cookie('__Host-rai-login', '', 0));
-    return response.status(status).json({ error: { code: 'connection_failed', message: status >= 500 ? 'Secure RxLedger connection is unavailable. Configuration and database migrations must be completed.' : error.message } });
+    return response.status(status).json({ error: feedback });
   }
 }
