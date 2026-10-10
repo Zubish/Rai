@@ -2,8 +2,10 @@ import { createRaiService, apiError } from "./rai-api.mjs";
 import { resolveRequestContext, validateChatBody } from "./request-context.mjs";
 import { handleConnection, resolveConnectedContext, sessionCookie } from './connection-http.mjs';
 import { publicFailure } from './public-failure.mjs';
+import { createHealthPassAnalytics, healthPassFailure } from './healthpass-analytics.mjs';
 
 const service = createRaiService();
+const healthPassAnalytics = createHealthPassAnalytics();
 const RATE_WINDOW_MS = 60_000;
 const RATE_LIMIT = 30;
 const requests = new Map();
@@ -14,6 +16,10 @@ export async function handleApiRequest(request, response) {
 
   try {
     enforceRateLimit(request);
+    if (request.method === 'POST' && request.url === '/api/rai/healthpass') {
+      try { request.body = await readJson(request); return sendJson(response, 200, { data: await healthPassAnalytics(request) }); }
+      catch (error) { const failure = healthPassFailure(error); return sendJson(response, failure.status, { error: failure.error }); }
+    }
     if (request.method === "GET" && request.url === "/api/rai/health") return sendJson(response, 200, { data: await service.health() });
     if (request.url.split('?')[0] === '/api/rai/connection' || request.url.split('?')[0] === '/api/rai/callback') {
       if (request.method === 'POST') request.body = await readJson(request);

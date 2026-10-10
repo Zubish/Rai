@@ -70,6 +70,16 @@ In local development, the API provides an isolated demo context. Production requ
 
 ## External RxLedger Boundary
 
+### HealthPass operational boundary
+
+Rai also serves HealthPass through the separate aggregate-only server contract in
+`RAI_HEALTHPASS_ACCESS_CONTRACT.md`. HealthPass remains authoritative for clinical
+records and signed prescription orders; RxLedger remains authoritative for actual
+pharmacy fulfilment. This initial Rai slice explains authorized prescription
+workflow counts, with no patient context, clinical tools or writes. HMO is deferred.
+HealthPass core workflows continue when inference is unavailable. Product-specific
+delegation remains separate; RxLedger access never grants HealthPass chart access.
+
 Rai may request approved capabilities for medication usage, unique patients, categories, sales and profit, reorder inputs, stockout risk, expiry risk, slow-moving stock, branch discovery, and report metadata.
 
 Every request and response must enforce tenant and branch scope. Responses should include source, generation time, date range, filters, and warnings. MVP access is read-only and authenticated server to server.
